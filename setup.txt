@@ -1,0 +1,9 @@
+1. ganache -p 8545
+
+
+Truffle workflow
+1. truffle init (creates folders)
+2. write smart contract(s) (like Storage.sol)
+3. truffle compile (outputs to build/contracts)
+4. truffle migrate (runs scripts in migrations AND deploys contracts to ganache local blockhain)
+5. Now we can interact through web3.js

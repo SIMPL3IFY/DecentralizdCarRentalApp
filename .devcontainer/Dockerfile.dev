@@ -1,0 +1,18 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Base packages, Git, and Node.js 18 LTS
+RUN apt-get update && apt-get install -y curl sudo git \
+  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y nodejs \
+  && npm install -g npm@11.6.2 \
+  && npm install -g truffle ganache \
+  && rm -rf /var/lib/apt/lists/*
+
+# Non-root user
+RUN useradd -ms /bin/bash node \
+  && echo "node ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/node \
+  && chmod 0440 /etc/sudoers.d/node
+
+USER node
