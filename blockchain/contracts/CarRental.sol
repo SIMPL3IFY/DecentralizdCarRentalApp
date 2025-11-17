@@ -5,7 +5,6 @@ contract CarRental {
     // ============ STRUCTS ============
     
     struct Owner {
-        address ownerAddress;
         string username;
         bytes32 loginHash; // Hash key for login
         bool isRegistered;
@@ -15,7 +14,6 @@ contract CarRental {
     }
     
     struct Renter {
-        address renterAddress;
         string username;
         bytes32 loginHash; // Hash key for login
         bool isRegistered;
@@ -23,7 +21,6 @@ contract CarRental {
     }
     
     struct Car {
-        uint256 carId;
         address owner;
         string make;
         string model;
@@ -36,7 +33,6 @@ contract CarRental {
     }
     
     struct Booking {
-        uint256 bookingId;
         uint256 carId;
         address renter;
         address owner;
@@ -52,7 +48,6 @@ contract CarRental {
     }
     
     struct Dispute {
-        uint256 disputeId;
         uint256 bookingId;
         address initiator; // Owner or Renter who opened the dispute
         string reason;
@@ -61,7 +56,6 @@ contract CarRental {
     }
     
     struct Insurance {
-        address renter;
         bool isVerified;
         bool isRevoked;
         uint256 verifiedAt;
@@ -169,7 +163,6 @@ contract CarRental {
         require(bytes(_username).length > 0, "Username cannot be empty");
         
         owners[msg.sender] = Owner({
-            ownerAddress: msg.sender,
             username: _username,
             loginHash: _passwordHash,
             isRegistered: true,
@@ -194,7 +187,6 @@ contract CarRental {
         require(bytes(_username).length > 0, "Username cannot be empty");
         
         renters[msg.sender] = Renter({
-            renterAddress: msg.sender,
             username: _username,
             loginHash: _passwordHash,
             isRegistered: true,
@@ -207,23 +199,19 @@ contract CarRental {
     }
     
     /**
-     * @dev Verify login for owner using password hash
+     * @dev Verify login using password hash
+     * @param isOwner True if checking owner login, false for renter
      * @param _passwordHash Hash of the password to verify
      * @return bool True if login hash matches
      */
-    function loginOwner(bytes32 _passwordHash) public view returns (bool) {
-        require(owners[msg.sender].isRegistered, "Owner not registered");
-        return owners[msg.sender].loginHash == _passwordHash;
-    }
-    
-    /**
-     * @dev Verify login for renter using password hash
-     * @param _passwordHash Hash of the password to verify
-     * @return bool True if login hash matches
-     */
-    function loginRenter(bytes32 _passwordHash) public view returns (bool) {
-        require(renters[msg.sender].isRegistered, "Renter not registered");
-        return renters[msg.sender].loginHash == _passwordHash;
+    function login(bool isOwner, bytes32 _passwordHash) public view returns (bool) {
+        if (isOwner) {
+            require(owners[msg.sender].isRegistered, "Owner not registered");
+            return owners[msg.sender].loginHash == _passwordHash;
+        } else {
+            require(renters[msg.sender].isRegistered, "Renter not registered");
+            return renters[msg.sender].loginHash == _passwordHash;
+        }
     }
     
     // ============ CAR LISTING FUNCTIONS ============
@@ -248,7 +236,6 @@ contract CarRental {
         carCounter++;
         uint256 newCarId = carCounter;
         Car storage newCar = cars[newCarId];
-        newCar.carId = newCarId;
         newCar.owner = msg.sender;
         newCar.make = _make;
         newCar.model = _model;
@@ -335,7 +322,6 @@ contract CarRental {
         
         bookingCounter++;
         Booking storage newBooking = bookings[bookingCounter];
-        newBooking.bookingId = bookingCounter;
         newBooking.carId = _carId;
         newBooking.renter = msg.sender;
         newBooking.owner = car.owner;
@@ -436,7 +422,6 @@ contract CarRental {
         
         disputeCounter++;
         disputes[disputeCounter] = Dispute({
-            disputeId: disputeCounter,
             bookingId: _bookingId,
             initiator: msg.sender,
             reason: _reason,
@@ -519,7 +504,6 @@ contract CarRental {
         require(!insuranceRecords[_renter].isVerified || insuranceRecords[_renter].isRevoked, "Insurance already verified");
         
         insuranceRecords[_renter] = Insurance({
-            renter: _renter,
             isVerified: true,
             isRevoked: false,
             verifiedAt: block.timestamp,
@@ -544,65 +528,45 @@ contract CarRental {
     // ============ RATING FUNCTIONS ============
     
     /**
-     * @dev Rate a renter (by owner)
+     * @dev Rate a user (owner rates renter, or renter rates owner)
      * @param _bookingId ID of the booking
      * @param _rating Rating value (1-5)
+     * @param rateOwner True if rating the owner, false if rating the renter
      */
-    function rateRenter(uint256 _bookingId, uint8 _rating) public onlyOwner {
+    function rate(uint256 _bookingId, uint8 _rating, bool rateOwner) public {
         Booking storage booking = bookings[_bookingId];
-        require(booking.owner == msg.sender, "Not the car owner");
         require(booking.status == BookingStatus.Settled, "Booking not settled");
         require(_rating >= 1 && _rating <= 5, "Rating must be between 1 and 5");
         
-        emit RatingSubmitted(_bookingId, msg.sender, booking.renter, _rating);
-    }
-    
-    /**
-     * @dev Rate an owner (by renter)
-     * @param _bookingId ID of the booking
-     * @param _rating Rating value (1-5)
-     */
-    function rateOwner(uint256 _bookingId, uint8 _rating) public onlyRenter {
-        Booking storage booking = bookings[_bookingId];
-        require(booking.renter == msg.sender, "Not the renter");
-        require(booking.status == BookingStatus.Settled, "Booking not settled");
-        require(_rating >= 1 && _rating <= 5, "Rating must be between 1 and 5");
-        
-        emit RatingSubmitted(_bookingId, msg.sender, booking.owner, _rating);
+        if (rateOwner) {
+            require(renters[msg.sender].isRegistered, "Not a registered renter");
+            require(booking.renter == msg.sender, "Not the renter");
+            emit RatingSubmitted(_bookingId, msg.sender, booking.owner, _rating);
+        } else {
+            require(owners[msg.sender].isRegistered, "Not a registered owner");
+            require(booking.owner == msg.sender, "Not the car owner");
+            emit RatingSubmitted(_bookingId, msg.sender, booking.renter, _rating);
+        }
     }
     
     // ============ ADMIN FUNCTIONS ============
     
     /**
-     * @dev Add an insurance verifier
+     * @dev Set insurance verifier status
      * @param _verifier Address of the verifier
+     * @param _status True to add, false to remove
      */
-    function addInsuranceVerifier(address _verifier) public onlyContractOwner {
-        insuranceVerifiers[_verifier] = true;
+    function setInsuranceVerifier(address _verifier, bool _status) public onlyContractOwner {
+        insuranceVerifiers[_verifier] = _status;
     }
     
     /**
-     * @dev Remove an insurance verifier
-     * @param _verifier Address of the verifier
-     */
-    function removeInsuranceVerifier(address _verifier) public onlyContractOwner {
-        insuranceVerifiers[_verifier] = false;
-    }
-    
-    /**
-     * @dev Add a dispute arbitrator
+     * @dev Set dispute arbitrator status
      * @param _arbitrator Address of the arbitrator
+     * @param _status True to add, false to remove
      */
-    function addDisputeArbitrator(address _arbitrator) public onlyContractOwner {
-        disputeArbitrators[_arbitrator] = true;
-    }
-    
-    /**
-     * @dev Remove a dispute arbitrator
-     * @param _arbitrator Address of the arbitrator
-     */
-    function removeDisputeArbitrator(address _arbitrator) public onlyContractOwner {
-        disputeArbitrators[_arbitrator] = false;
+    function setDisputeArbitrator(address _arbitrator, bool _status) public onlyContractOwner {
+        disputeArbitrators[_arbitrator] = _status;
     }
     
     // ============ VIEW FUNCTIONS ============
@@ -612,7 +576,6 @@ contract CarRental {
      * @param _owner Address of the owner
      */
     function getOwner(address _owner) public view returns (
-        address ownerAddress,
         string memory username,
         bool isRegistered,
         uint256 totalEarnings,
@@ -620,7 +583,6 @@ contract CarRental {
         uint256 totalListings
     ) {
         Owner storage o = owners[_owner];
-        ownerAddress = o.ownerAddress;
         username = o.username;
         isRegistered = o.isRegistered;
         totalEarnings = o.totalEarnings;
@@ -633,13 +595,11 @@ contract CarRental {
      * @param _renter Address of the renter
      */
     function getRenter(address _renter) public view returns (
-        address renterAddress,
         string memory username,
         bool isRegistered,
         uint256 totalBookings
     ) {
         Renter storage r = renters[_renter];
-        renterAddress = r.renterAddress;
         username = r.username;
         isRegistered = r.isRegistered;
         totalBookings = r.totalBookings;
@@ -650,14 +610,12 @@ contract CarRental {
      * @param _carId ID of the car
      */
     function getCarBasic(uint256 _carId) public view returns (
-        uint256 carId,
         address owner,
         string memory make,
         string memory model,
         uint256 year
     ) {
         Car storage c = cars[_carId];
-        carId = c.carId;
         owner = c.owner;
         make = c.make;
         model = c.model;
@@ -686,13 +644,11 @@ contract CarRental {
      * @param _bookingId ID of the booking
      */
     function getBookingBasic(uint256 _bookingId) public view returns (
-        uint256 bookingId,
         uint256 carId,
         address renter,
         address owner
     ) {
         Booking storage b = bookings[_bookingId];
-        bookingId = b.bookingId;
         carId = b.carId;
         renter = b.renter;
         owner = b.owner;

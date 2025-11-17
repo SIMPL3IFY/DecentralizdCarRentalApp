@@ -193,9 +193,9 @@ export default function App() {
             for (let i = 1; i <= 50; i++) {
                 try {
                     const carBasic = await contract.methods.getCarBasic(i).call();
-                    if (carBasic.carId && carBasic.carId !== "0" && carBasic.owner.toLowerCase() === account.toLowerCase()) {
+                    if (carBasic.owner && carBasic.owner.toLowerCase() === account.toLowerCase()) {
                         const carRental = await contract.methods.getCarRental(i).call();
-                        ownerCars.push({ ...carBasic, ...carRental });
+                        ownerCars.push({ carId: i, ...carBasic, ...carRental });
                     }
                 } catch (e) {
                     // Car doesn't exist, skip
@@ -217,12 +217,12 @@ export default function App() {
             for (let i = 1; i <= 10; i++) {
                 try {
                     const car = await contract.methods.getCarBasic(i).call();
-                    if (car.carId && car.carId !== "0") {
+                    if (car.owner && car.owner !== "0x0000000000000000000000000000000000000000") {
                         const rental = await contract.methods
                             .getCarRental(i)
                             .call();
                         if (rental.isListed && rental.isAvailable) {
-                            cars.push({ ...car, ...rental });
+                            cars.push({ carId: i, ...car, ...rental });
                         }
                     }
                 } catch (e) {

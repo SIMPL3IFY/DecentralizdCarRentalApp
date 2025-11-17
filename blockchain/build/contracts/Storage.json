@@ -575,12 +575,12 @@
     "1763324953437": {
       "events": {},
       "links": {},
-      "address": "0x1E544465a5fe31c56b4dc4B7962fb42dCb5fe012",
-      "transactionHash": "0xd91c76fb07c33ec0403bb19fd92b03ffc3e7abfb85a0ac7b7d7d61f3b7caf6a3"
+      "address": "0x244e47bf786a1E05530ef6d3aEfDbe9B21681D70",
+      "transactionHash": "0x67a6ceb4f1d50db07e95928021d225c507e29425ce45598c97dd3b975103799c"
     }
   },
   "schemaVersion": "3.4.16",
-  "updatedAt": "2025-11-16T21:49:27.302Z",
+  "updatedAt": "2025-11-17T06:16:18.212Z",
   "networkType": "ethereum",
   "devdoc": {
     "kind": "dev",
