@@ -5,9 +5,9 @@
 const truffleAssert = require("truffle-assertions");
 const { assert } = require("chai");
 
-const CarShareMinimal = artifacts.require("CarShareMinimal");
+const CarRental = artifacts.require("CarRental");
 
-contract("CarShareMinimal", (accounts) => {
+contract("CarRental", (accounts) => {
     const [
         platform,
         insuranceVerifier,
@@ -28,12 +28,9 @@ contract("CarShareMinimal", (accounts) => {
     }
 
     async function deployFresh() {
-        return await CarShareMinimal.new(
-            insuranceVerifier,
-            arbitrator,
-            FEE_BPS,
-            { from: platform }
-        );
+        return await CarRental.new(insuranceVerifier, arbitrator, FEE_BPS, {
+            from: platform,
+        });
     }
 
     async function registerBoth(cs) {
@@ -42,9 +39,18 @@ contract("CarShareMinimal", (accounts) => {
     }
 
     async function createAndVerifyListing(cs) {
-        await cs.createListing(DAILY_PRICE, DEPOSIT, "ipfs://insurance.pdf", {
-            from: listingOwner,
-        });
+        await cs.createListing(
+            DAILY_PRICE,
+            DEPOSIT,
+            "ipfs://insurance.pdf",
+            "Toyota",
+            "Camry",
+            2020,
+            "New York, NY",
+            {
+                from: listingOwner,
+            }
+        );
         await cs.verifyInsurance(0, true, { from: insuranceVerifier });
     }
 
@@ -404,9 +410,18 @@ contract("CarShareMinimal", (accounts) => {
         it("insurance must be valid before request", async () => {
             const cs = await deployFresh();
             await registerBoth(cs);
-            await cs.createListing(DAILY_PRICE, DEPOSIT, "uri", {
-                from: listingOwner,
-            }); // id 0
+            await cs.createListing(
+                DAILY_PRICE,
+                DEPOSIT,
+                "uri",
+                "Honda",
+                "Civic",
+                2021,
+                "Los Angeles, CA",
+                {
+                    from: listingOwner,
+                }
+            ); // id 0
             await cs.verifyInsurance(0, false, { from: insuranceVerifier });
 
             const { start, end } = await getStartEnd(3);
@@ -423,9 +438,18 @@ contract("CarShareMinimal", (accounts) => {
         it("only insurance verifier can verify insurance", async () => {
             const cs = await deployFresh();
             await registerBoth(cs);
-            await cs.createListing(DAILY_PRICE, DEPOSIT, "uri", {
-                from: listingOwner,
-            });
+            await cs.createListing(
+                DAILY_PRICE,
+                DEPOSIT,
+                "uri",
+                "Ford",
+                "Focus",
+                2022,
+                "Chicago, IL",
+                {
+                    from: listingOwner,
+                }
+            );
 
             await truffleAssert.reverts(
                 cs.verifyInsurance(0, true, { from: renter }),
@@ -438,6 +462,93 @@ contract("CarShareMinimal", (accounts) => {
             await truffleAssert.reverts(
                 cs.verifyInsurance(0, true, { from: stranger }),
                 "not insurance"
+            );
+        });
+
+        it("insurance verifier cannot create listings", async () => {
+            const cs = await deployFresh();
+            await cs.register({ from: insuranceVerifier });
+            await truffleAssert.reverts(
+                cs.createListing(
+                    DAILY_PRICE,
+                    DEPOSIT,
+                    "uri",
+                    "Tesla",
+                    "Model S",
+                    2023,
+                    "San Francisco, CA",
+                    {
+                        from: insuranceVerifier,
+                    }
+                ),
+                "insurance verifier cannot create listings"
+            );
+        });
+
+        it("arbitrator cannot create listings", async () => {
+            const cs = await deployFresh();
+            await cs.register({ from: arbitrator });
+            await truffleAssert.reverts(
+                cs.createListing(
+                    DAILY_PRICE,
+                    DEPOSIT,
+                    "uri",
+                    "BMW",
+                    "X5",
+                    2024,
+                    "Miami, FL",
+                    {
+                        from: arbitrator,
+                    }
+                ),
+                "arbitrator cannot create listings"
+            );
+        });
+
+        it("insurance verifier cannot book cars", async () => {
+            const cs = await deployFresh();
+            await registerBoth(cs);
+            await cs.register({ from: insuranceVerifier });
+            await createAndVerifyListing(cs);
+            const { start, end } = await getStartEnd(3);
+            const escrow = bn(DAILY_PRICE).mul(bn(3)).add(bn(DEPOSIT));
+            await truffleAssert.reverts(
+                cs.requestBooking(0, start, end, {
+                    from: insuranceVerifier,
+                    value: escrow,
+                }),
+                "insurance verifier cannot book cars"
+            );
+        });
+
+        it("arbitrator cannot book cars", async () => {
+            const cs = await deployFresh();
+            await registerBoth(cs);
+            await cs.register({ from: arbitrator });
+            await createAndVerifyListing(cs);
+            const { start, end } = await getStartEnd(3);
+            const escrow = bn(DAILY_PRICE).mul(bn(3)).add(bn(DEPOSIT));
+            await truffleAssert.reverts(
+                cs.requestBooking(0, start, end, {
+                    from: arbitrator,
+                    value: escrow,
+                }),
+                "arbitrator cannot book cars"
+            );
+        });
+
+        it("owner cannot book own listing", async () => {
+            const cs = await deployFresh();
+            await registerBoth(cs);
+            await createAndVerifyListing(cs);
+            const { start, end } = await getStartEnd(3);
+            const escrow = bn(DAILY_PRICE).mul(bn(3)).add(bn(DEPOSIT));
+            await truffleAssert.reverts(
+                cs.requestBooking(0, start, end, {
+                    from: listingOwner,
+                    value: escrow,
+                }),
+                "cannot book own listing"
             );
         });
 
@@ -623,6 +734,10 @@ contract("CarShareMinimal", (accounts) => {
             );
         });
 
+        // Note: Arbitrator cannot create listings or book cars, so the previous
+        // conflict-of-interest tests are no longer applicable. The restrictions
+        // are now enforced at the createListing and requestBooking level.
+
         it("non-parties cannot confirm pickup/return", async () => {
             const cs = await deployFresh();
             await registerBoth(cs);
@@ -657,9 +772,19 @@ contract("CarShareMinimal", (accounts) => {
             await registerBoth(cs);
             await createAndVerifyListing(cs);
             await truffleAssert.reverts(
-                cs.editListing(0, DAILY_PRICE, DEPOSIT, "x", {
-                    from: renter,
-                }),
+                cs.editListing(
+                    0,
+                    DAILY_PRICE,
+                    DEPOSIT,
+                    "x",
+                    "Chevrolet",
+                    "Malibu",
+                    2023,
+                    "Phoenix, AZ",
+                    {
+                        from: renter,
+                    }
+                ),
                 "not listing owner"
             );
             await truffleAssert.reverts(
@@ -681,7 +806,16 @@ contract("CarShareMinimal", (accounts) => {
             const cs = await deployFresh();
             await registerBoth(cs);
             await truffleAssert.reverts(
-                cs.createListing(0, DEPOSIT, "uri", { from: listingOwner }),
+                cs.createListing(
+                    0,
+                    DEPOSIT,
+                    "uri",
+                    "Tesla",
+                    "Model 3",
+                    2023,
+                    "San Francisco, CA",
+                    { from: listingOwner }
+                ),
                 "bad price"
             );
         });
@@ -691,7 +825,17 @@ contract("CarShareMinimal", (accounts) => {
             await registerBoth(cs);
             await createAndVerifyListing(cs);
             await truffleAssert.reverts(
-                cs.editListing(0, 0, DEPOSIT, "uri", { from: listingOwner }),
+                cs.editListing(
+                    0,
+                    0,
+                    DEPOSIT,
+                    "uri",
+                    "BMW",
+                    "X5",
+                    2024,
+                    "Miami, FL",
+                    { from: listingOwner }
+                ),
                 "bad price"
             );
         });
@@ -729,6 +873,10 @@ contract("CarShareMinimal", (accounts) => {
                 web3.utils.toWei("0.06", "ether"),
                 DEPOSIT,
                 "uri2",
+                "Mercedes",
+                "C-Class",
+                2023,
+                "Seattle, WA",
                 { from: listingOwner }
             );
             const { start, end } = await getStartEnd(3);
@@ -807,18 +955,40 @@ contract("CarShareMinimal", (accounts) => {
             const cs = await deployFresh();
             await registerBoth(cs);
 
-            await cs.createListing(DAILY_PRICE, DEPOSIT, "uri1", {
-                from: listingOwner,
-            });
+            await cs.createListing(
+                DAILY_PRICE,
+                DEPOSIT,
+                "uri1",
+                "Audi",
+                "A4",
+                2022,
+                "Boston, MA",
+                {
+                    from: listingOwner,
+                }
+            );
             await cs.createListing(
                 web3.utils.toWei("0.06", "ether"),
                 DEPOSIT,
                 "uri2",
+                "Volkswagen",
+                "Jetta",
+                2021,
+                "Portland, OR",
                 { from: listingOwner }
             );
-            await cs.createListing(DAILY_PRICE, DEPOSIT, "uri3", {
-                from: listingOwner,
-            });
+            await cs.createListing(
+                DAILY_PRICE,
+                DEPOSIT,
+                "uri3",
+                "Nissan",
+                "Altima",
+                2020,
+                "Denver, CO",
+                {
+                    from: listingOwner,
+                }
+            );
 
             const listing0 = await cs.listings(0);
             const listing1 = await cs.listings(1);
@@ -868,6 +1038,10 @@ contract("CarShareMinimal", (accounts) => {
                 web3.utils.toWei("0.10", "ether"), // double the price
                 web3.utils.toWei("1.0", "ether"), // double the deposit
                 "new_uri",
+                "Lexus",
+                "RX",
+                2024,
+                "Austin, TX",
                 { from: listingOwner }
             );
 
