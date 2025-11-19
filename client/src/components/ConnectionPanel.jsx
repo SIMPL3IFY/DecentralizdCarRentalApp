@@ -3,41 +3,15 @@ import { web3Service } from "../services/web3Service";
 
 export const ConnectionPanel = ({
     onWeb3Connected,
-    onContractLoaded,
     log,
     onAccountSwitched,
     isInitializing = false,
     initError = null,
     isContractLoaded = false,
+    contractAddress = null,
 }) => {
-    const [contractAddr, setContractAddr] = useState(
-        localStorage.getItem("contractAddress") || ""
-    );
-    const [isConnecting, setIsConnecting] = useState(false);
-    const [isLoadingContract, setIsLoadingContract] = useState(false);
     const [availableAccounts, setAvailableAccounts] = useState([]);
     const [isSwitching, setIsSwitching] = useState(false);
-
-    const handleInitRPC = async () => {
-        setIsConnecting(true);
-        log("Connecting...");
-        try {
-            const result = await web3Service.init();
-            if (result.success) {
-                log(`Connected. Account: ${result.account}`);
-                log(`ChainId: ${result.chainId}`);
-                log(`Accounts: ${result.accounts?.length || 0}`);
-                setAvailableAccounts(result.accounts || []);
-                onWeb3Connected(result);
-            } else {
-                log(`Error: ${result.error}`);
-            }
-        } catch (error) {
-            log(`Error: ${error.message}`);
-        } finally {
-            setIsConnecting(false);
-        }
-    };
 
     const handleSwitchAccount = async (newAccount) => {
         if (newAccount === web3Service.getAccount()) {
@@ -68,33 +42,6 @@ export const ConnectionPanel = ({
         loadAccounts();
     }, []);
 
-    const handleLoadContract = async () => {
-        if (!web3Service.isInitialized()) {
-            log("Initialize RPC first");
-            return;
-        }
-        if (!contractAddr) {
-            log("Enter contract address");
-            return;
-        }
-
-        setIsLoadingContract(true);
-        log(`Loading contract...`);
-        try {
-            const result = await onContractLoaded(contractAddr);
-            if (result.success) {
-                log(`Contract loaded`);
-                localStorage.setItem("contractAddress", contractAddr);
-            } else {
-                log(`Error: ${result.error}`);
-            }
-        } catch (error) {
-            log(`Error: ${error.message}`);
-        } finally {
-            setIsLoadingContract(false);
-        }
-    };
-
     const account = web3Service.getAccount();
     const chainId = web3Service.getChainId();
 
@@ -123,7 +70,7 @@ export const ConnectionPanel = ({
                         <strong>Error:</strong> {initError}
                     </p>
                     <p className="text-sm text-red-600 mt-1">
-                        Try manual initialization below
+                        Check the contract address in config.js
                     </p>
                 </div>
             )}
@@ -179,37 +126,6 @@ export const ConnectionPanel = ({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <button
-                    onClick={handleInitRPC}
-                    disabled={isConnecting || isInitializing}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg"
-                >
-                    {isConnecting ? "Connecting..." : "Reconnect RPC"}
-                </button>
-                <div className="space-y-2">
-                    <input
-                        type="text"
-                        placeholder="Contract address (0x...)"
-                        value={contractAddr}
-                        onChange={(e) => setContractAddr(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                        onClick={handleLoadContract}
-                        disabled={
-                            isLoadingContract ||
-                            !web3Service.isInitialized() ||
-                            isInitializing
-                        }
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-colors shadow-md hover:shadow-lg"
-                    >
-                        {isLoadingContract
-                            ? "Loading..."
-                            : "Load/Reload Contract"}
-                    </button>
-                </div>
-            </div>
             <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div className="bg-gray-50 p-3 rounded-lg">
@@ -223,6 +139,31 @@ export const ConnectionPanel = ({
                         <span className="text-blue-600">{chainId || "-"}</span>
                     </div>
                 </div>
+                {contractAddress && (
+                    <div className="bg-gray-50 p-3 rounded-lg text-sm">
+                        <span className="font-semibold">
+                            Contract Address:{" "}
+                        </span>
+                        <span className="text-blue-600 break-all font-mono text-xs">
+                            {contractAddress}
+                        </span>
+                        {isInitializing && (
+                            <span className="ml-2 text-yellow-600 text-xs">
+                                (Loading...)
+                            </span>
+                        )}
+                        {!isInitializing && !isContractLoaded && (
+                            <span className="ml-2 text-red-600 text-xs">
+                                (Failed to load)
+                            </span>
+                        )}
+                        {!isInitializing && isContractLoaded && (
+                            <span className="ml-2 text-green-600 text-xs">
+                                (Loaded)
+                            </span>
+                        )}
+                    </div>
+                )}
                 {web3Service.isInitialized() &&
                     availableAccounts.length > 1 && (
                         <div className="bg-blue-50 p-3 rounded-lg">

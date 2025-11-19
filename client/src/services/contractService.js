@@ -21,6 +21,14 @@ class ContractService {
                 throw new Error("Web3 not initialized");
             }
 
+            // Check if contract exists at this address
+            const code = await web3.eth.getCode(contractAddress);
+            if (!code || code === "0x" || code === "0x0") {
+                throw new Error(
+                    "No contract found at this address. The address is valid but no contract is deployed there."
+                );
+            }
+
             const response = await fetch(CONTRACT_ABI_PATH);
             const artifact = await response.json();
             const abi = artifact.abi;
@@ -39,6 +47,13 @@ class ContractService {
      */
     getContract() {
         return this.contract;
+    }
+
+    /**
+     * Get contract address
+     */
+    getContractAddress() {
+        return this.contractAddress;
     }
 
     /**

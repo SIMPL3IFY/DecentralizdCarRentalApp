@@ -8,6 +8,7 @@ import { ArbitratorDashboard } from "./components/ArbitratorDashboard";
 import { useContract } from "./hooks/useContract";
 import { useUser } from "./hooks/useUser";
 import { web3Service } from "./services/web3Service";
+import { contractService } from "./services/contractService";
 import { CONTRACT_ADDRESS } from "./constants/config";
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
     const [activeTab, setActiveTab] = useState("owner");
     const [isInitializing, setIsInitializing] = useState(true);
     const [initError, setInitError] = useState(null);
+    const [contractAddress, setContractAddress] = useState(null);
 
     const { contract, loadContract, isLoaded } = useContract();
     const {
@@ -30,10 +32,6 @@ export default function App() {
 
     const onConnect = () => {
         // Web3 connected
-    };
-
-    const onLoadContract = async (contractAddress) => {
-        return await loadContract(contractAddress);
     };
 
     const onSwitchAccount = async (newAccount) => {
@@ -80,18 +78,25 @@ export default function App() {
                 append(`Chain ID: ${rpcResult.chainId}`);
                 append(`Accounts: ${rpcResult.accounts?.length || 0}`);
 
-                const contractAddress =
+                const contractAddressToLoad =
                     CONTRACT_ADDRESS || localStorage.getItem("contractAddress");
 
-                if (contractAddress) {
+                setContractAddress(contractAddressToLoad);
+
+                if (contractAddressToLoad) {
                     append(`Loading contract...`);
-                    const contractResult = await loadContract(contractAddress);
+                    const contractResult = await loadContract(
+                        contractAddressToLoad
+                    );
 
                     if (contractResult.success) {
                         append(`Contract loaded`);
                         localStorage.setItem(
                             "contractAddress",
-                            contractAddress
+                            contractAddressToLoad
+                        );
+                        setContractAddress(
+                            contractService.getContractAddress()
                         );
                     } else {
                         append(`Contract failed: ${contractResult.error}`);
@@ -135,12 +140,14 @@ export default function App() {
 
                 <ConnectionPanel
                     onWeb3Connected={onConnect}
-                    onContractLoaded={onLoadContract}
                     onAccountSwitched={onSwitchAccount}
                     log={append}
                     isInitializing={isInitializing}
                     initError={initError}
                     isContractLoaded={isLoaded}
+                    contractAddress={
+                        contractAddress || contractService.getContractAddress()
+                    }
                 />
 
                 {isLoaded && (
