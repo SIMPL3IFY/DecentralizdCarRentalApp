@@ -8,9 +8,9 @@ echo ""
 # Check if Ganache is running
 echo "Step 1: Checking if Ganache is running..."
 if curl -s http://127.0.0.1:8545 > /dev/null 2>&1; then
-    echo "✓ Ganache is running on port 8545"
+    echo "Ganache is running on port 8545"
 else
-    echo "✗ Ganache is not running!"
+    echo "Ganache is not running!"
     echo "  Please start Ganache first: ganache -p 8545"
     exit 1
 fi
@@ -19,19 +19,19 @@ echo ""
 echo "Step 2: Compiling contracts..."
 truffle compile
 if [ $? -ne 0 ]; then
-    echo "✗ Compilation failed!"
+    echo "Compilation failed!"
     exit 1
 fi
-echo "✓ Compilation successful"
+echo "Compilation successful"
 
 echo ""
 echo "Step 3: Deploying contracts..."
 truffle migrate
 if [ $? -ne 0 ]; then
-    echo "✗ Deployment failed!"
+    echo "Deployment failed!"
     exit 1
 fi
-echo "✓ Deployment successful"
+echo "Deployment successful"
 
 echo ""
 echo "=========================================="
