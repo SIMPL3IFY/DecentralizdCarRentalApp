@@ -148,6 +148,17 @@ export default function App() {
                     contractAddress={
                         contractAddress || contractService.getContractAddress()
                     }
+                    onLoadContract={async (address) => {
+                        setContractAddress(address);
+                        const result = await loadContract(address);
+                        if (result.success) {
+                            localStorage.setItem("contractAddress", address);
+                            setContractAddress(
+                                contractService.getContractAddress()
+                            );
+                        }
+                        return result;
+                    }}
                 />
 
                 {isLoaded && (
