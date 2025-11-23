@@ -1,12 +1,14 @@
 import React from "react";
-import { useUser } from "../hooks/useUser";
 import { contractService } from "../services/contractService";
 import { web3Service } from "../services/web3Service";
 
-export const RegistrationPanel = ({ contract, log }) => {
-    const { isRegistered, isLoading, register, checkRegistration } =
-        useUser(contract);
-
+export const RegistrationPanel = ({
+    contract,
+    log,
+    register,
+    checkRegistration,
+    isLoading,
+}) => {
     const handleRegister = async () => {
         log("Registering...");
         const result = await register();
@@ -64,21 +66,6 @@ export const RegistrationPanel = ({ contract, log }) => {
             console.error("Registration check error:", error);
         }
     };
-
-    if (isRegistered) {
-        return (
-            <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4">
-                    Registration Status
-                </h2>
-                <div className="bg-green-50 p-4 rounded-lg">
-                    <p className="text-green-800 font-semibold">
-                        You are registered
-                    </p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">

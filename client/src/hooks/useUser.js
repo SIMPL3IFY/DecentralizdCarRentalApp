@@ -122,6 +122,16 @@ export const useUser = (contract) => {
         return unsubscribe;
     }, [checkRegistration]);
 
+    // Watch for registration status changes and ensure data is fresh
+    useEffect(() => {
+        if (contract && isRegistered) {
+            console.log("User is now registered! Refreshing user data...");
+            // Ensure all user data (roles, balances) is fresh when registration status changes
+            fetchUserData();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRegistered, contract]);
+
     return {
         isRegistered,
         isLoading,

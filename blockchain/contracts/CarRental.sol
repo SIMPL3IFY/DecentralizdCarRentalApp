@@ -4,17 +4,17 @@ pragma solidity ^0.8.0;
 contract CarRental {
     /* =========================== Roles & Config =========================== */
 
-    address public owner;                 // contract owner (platform)
+    address public contractOwner;         // contract owner (platform admin)
     address public insuranceVerifier;     // role
     address public arbitrator;            // role
     uint16  public platformFeeBps;        // optional marketplace fee on rental (not deposit), e.g., 200 = 2%
 
-    modifier onlyOwner() { require(msg.sender == owner, "not platform"); _; }
+    modifier onlyOwner() { require(msg.sender == contractOwner, "not contract owner"); _; }
     modifier onlyInsurance() { require(msg.sender == insuranceVerifier, "not insurance"); _; }
     modifier onlyArbitrator() { require(msg.sender == arbitrator, "not arbitrator"); _; }
 
     constructor(address _insuranceVerifier, address _arbitrator, uint16 _feeBps) {
-        owner = msg.sender;
+        contractOwner = msg.sender;
         insuranceVerifier = _insuranceVerifier;
         arbitrator = _arbitrator;
         platformFeeBps = _feeBps; // can be 0
@@ -48,10 +48,10 @@ contract CarRental {
     /* =============================== Listings ============================= */
 
     struct Listing {
-        address payable ownerAddr;
+        address payable carOwner;         // car owner (listing creator)
         uint256 dailyPrice;        // in wei per day
         uint256 securityDeposit;   // in wei
-        bool    active;            // owner can pause/unpause
+        bool    active;            // car owner can pause/unpause
         bool    insuranceValid;    // set by InsuranceVerifier
         string  insuranceDocURI;   // optional
         string  make;              // car make/brand
@@ -61,7 +61,7 @@ contract CarRental {
     }
     Listing[] public listings;
 
-    event ListingCreated(uint256 indexed listingId, address indexed owner);
+    event ListingCreated(uint256 indexed listingId, address indexed carOwner);
     event ListingEdited(uint256 indexed listingId);
     event ListingActive(uint256 indexed listingId, bool active);
     event InsuranceVerified(uint256 indexed listingId, bool valid);
@@ -81,7 +81,7 @@ contract CarRental {
         require(dailyPrice > 0, "bad price");
         require(year > 1900 && year <= 2100, "invalid year");
         listings.push(Listing({
-            ownerAddr: payable(msg.sender),
+            carOwner: payable(msg.sender),
             dailyPrice: dailyPrice,
             securityDeposit: securityDeposit,
             active: true,
@@ -107,7 +107,7 @@ contract CarRental {
         string calldata location
     ) external {
         Listing storage L = listings[listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         require(dailyPrice > 0, "bad price");
         require(year > 1900 && year <= 2100, "invalid year");
         L.dailyPrice = dailyPrice;
@@ -122,7 +122,7 @@ contract CarRental {
 
     function setListingActive(uint256 listingId, bool active_) external {
         Listing storage L = listings[listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         L.active = active_;
         emit ListingActive(listingId, active_);
     }
@@ -136,12 +136,12 @@ contract CarRental {
 
     enum BookingStatus {
         None,
-        Requested,     // renter escrowed funds; waiting for owner approve/reject
+        Requested,     // renter escrowed funds; waiting for car owner approve/reject
         Approved,      // pickup pending
         Active,        // pickup confirmed by both
         ReturnPending, // one party has confirmed return
         Completed,     // funds split; ratings enabled
-        Rejected,      // rejected by owner; refunded
+        Rejected,      // rejected by car owner; refunded
         Cancelled,     // cancelled before activation; refunded
         Disputed       // arbitrator must resolve
     }
@@ -209,9 +209,10 @@ contract CarRental {
         require(msg.sender != insuranceVerifier, "insurance verifier cannot book cars");
         require(msg.sender != arbitrator, "arbitrator cannot book cars");
         Listing storage L = listings[listingId];
-        require(msg.sender != L.ownerAddr, "cannot book own listing");
+        require(msg.sender != L.carOwner, "cannot book own listing");
         require(L.active, "listing inactive");
         require(L.insuranceValid, "insurance not valid");
+        require(startDate >= block.timestamp, "start date must be in the future");
         uint256 numDays = daysBetween(startDate, endDate);
         require(numDays > 0, "min 1 day");
 
@@ -237,7 +238,7 @@ contract CarRental {
     function approveBooking(uint256 bookingId) external {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         require(B.status == BookingStatus.Requested, "bad status");
         B.status = BookingStatus.Approved;
         emit BookingApproved(bookingId);
@@ -246,7 +247,7 @@ contract CarRental {
     function rejectBooking(uint256 bookingId) external nonReentrant {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         require(B.status == BookingStatus.Requested, "bad status");
         uint256 refund = B.escrow;
         B.escrow = 0;
@@ -273,7 +274,7 @@ contract CarRental {
         if (msg.sender == B.renter) {
             B.renterPickup = true;
             B.pickupProofURI_renter = proofURI;
-        } else if (msg.sender == L.ownerAddr) {
+        } else if (msg.sender == L.carOwner) {
             B.ownerPickup = true;
             B.pickupProofURI_owner = proofURI;
         } else {
@@ -293,7 +294,7 @@ contract CarRental {
         if (msg.sender == B.renter) {
             B.renterReturn = true;
             B.returnProofURI_renter = proofURI;
-        } else if (msg.sender == L.ownerAddr) {
+        } else if (msg.sender == L.carOwner) {
             B.ownerReturn = true;
             B.returnProofURI_owner = proofURI;
         } else {
@@ -313,7 +314,7 @@ contract CarRental {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
         require(
-            msg.sender == B.renter || msg.sender == L.ownerAddr,
+            msg.sender == B.renter || msg.sender == L.carOwner,
             "not party"
         );
         require(
@@ -339,9 +340,9 @@ contract CarRental {
         uint256 fee = (ownerPayout * platformFeeBps) / 10_000;
         uint256 ownerNet = ownerPayout - fee;
 
-        balances[L.ownerAddr] += ownerNet;
+        balances[L.carOwner] += ownerNet;
         balances[B.renter] += renterPayout;
-        balances[owner] += fee;
+        balances[contractOwner] += fee;
 
         B.escrow = 0;
         B.status = BookingStatus.Completed;
@@ -362,9 +363,9 @@ contract CarRental {
         uint256 renterBack = B.deposit;
 
         require(B.escrow == B.rentalCost + B.deposit, "escrow mismatch");
-        balances[L.ownerAddr] += ownerNet;
+        balances[L.carOwner] += ownerNet;
         balances[B.renter]   += renterBack;
-        balances[owner]      += fee;
+        balances[contractOwner]      += fee;
 
         B.escrow = 0;
         B.status = BookingStatus.Completed;
@@ -390,9 +391,9 @@ contract CarRental {
 
     function rateRenter(uint256 bookingId, uint8 score) external {
         Booking storage B = bookings[bookingId];
-        address listingOwner = listings[B.listingId].ownerAddr;
+        address carOwner = listings[B.listingId].carOwner;
         require(B.status == BookingStatus.Completed, "not completed");
-        require(msg.sender == listingOwner, "only owner");
+        require(msg.sender == carOwner, "only car owner");
         require(score >= 1 && score <= 5, "1..5");
         require(!rateRenterScore[bookingId].set, "rated");
         rateRenterScore[bookingId] = Rating(score, true);
