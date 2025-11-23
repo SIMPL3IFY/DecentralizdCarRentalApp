@@ -4,8 +4,7 @@
 export const RPC_URL = "http://127.0.0.1:8545";
 export const CONTRACT_ABI_PATH = "/CarRental.json";
 // Contract address - can be set here or will be loaded from localStorage
-// Set to null to require manual entry
-export const CONTRACT_ADDRESS = "0xc4AaeE422B5602A48CAc94c8A08DC50cC124b3Bd"; 
+export const CONTRACT_ADDRESS = "0x6ac7a8B5611df0E6e587A9F059981b765CCc0229"; 
 export const GAS_LIMITS = {
     register: 100000,
     createListing: 500000,

@@ -24,6 +24,8 @@ export default function App() {
         checkRegistration,
         isInsuranceVerifier,
         isArbitrator,
+        register,
+        isLoading: isUserLoading,
     } = useUser(contract);
 
     const append = (message) => {
@@ -169,7 +171,13 @@ export default function App() {
                 )}
 
                 {isLoaded && !isRegistered && (
-                    <RegistrationPanel contract={contract} log={append} />
+                    <RegistrationPanel
+                        contract={contract}
+                        log={append}
+                        register={register}
+                        checkRegistration={checkRegistration}
+                        isLoading={isUserLoading}
+                    />
                 )}
 
                 {isLoaded && isRegistered && (
