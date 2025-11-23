@@ -385,7 +385,7 @@ contract("CarRental", (accounts) => {
             // Renter cannot rate themselves
             await truffleAssert.reverts(
                 cs.rateRenter(bookingId, 5, { from: renter }),
-                "only owner"
+                "only car owner"
             );
         });
     });
@@ -399,11 +399,11 @@ contract("CarRental", (accounts) => {
 
             await truffleAssert.reverts(
                 cs.approveBooking(bookingId, { from: renter }),
-                "not listing owner"
+                "not car owner"
             );
             await truffleAssert.reverts(
                 cs.rejectBooking(bookingId, { from: renter }),
-                "not listing owner"
+                "not car owner"
             );
         });
 
@@ -759,11 +759,11 @@ contract("CarRental", (accounts) => {
             const cs = await deployFresh();
             await truffleAssert.reverts(
                 cs.setRoles(accounts[8], accounts[9], { from: renter }),
-                "not platform"
+                "not contract owner"
             );
             await truffleAssert.reverts(
                 cs.setPlatformFee(500, { from: renter }),
-                "not platform"
+                "not contract owner"
             );
         });
 
@@ -785,11 +785,11 @@ contract("CarRental", (accounts) => {
                         from: renter,
                     }
                 ),
-                "not listing owner"
+                "not car owner"
             );
             await truffleAssert.reverts(
                 cs.setListingActive(0, false, { from: renter }),
-                "not listing owner"
+                "not car owner"
             );
         });
 
@@ -994,9 +994,9 @@ contract("CarRental", (accounts) => {
             const listing1 = await cs.listings(1);
             const listing2 = await cs.listings(2);
 
-            assert.equal(listing0.ownerAddr, listingOwner);
-            assert.equal(listing1.ownerAddr, listingOwner);
-            assert.equal(listing2.ownerAddr, listingOwner);
+            assert.equal(listing0.carOwner, listingOwner);
+            assert.equal(listing1.carOwner, listingOwner);
+            assert.equal(listing2.carOwner, listingOwner);
             assert(listing0.dailyPrice.eq(bn(DAILY_PRICE)));
             assert(
                 listing1.dailyPrice.eq(bn(web3.utils.toWei("0.06", "ether")))

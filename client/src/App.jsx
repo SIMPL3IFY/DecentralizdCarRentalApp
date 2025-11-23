@@ -245,7 +245,7 @@ export default function App() {
 
                 <div className="bg-white rounded-2xl shadow-xl p-6">
                     <h3 className="text-2xl font-semibold text-gray-800 mb-4">
-                        Log
+                        Log(For Dev Only)
                     </h3>
                     <div className="bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-lg overflow-auto max-h-96 whitespace-pre-wrap">
                         {log}

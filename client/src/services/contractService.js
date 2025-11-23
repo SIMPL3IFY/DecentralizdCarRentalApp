@@ -69,7 +69,7 @@ class ContractService {
      * Parse listing data from contract response
      */
     _parseListing(listing, listingId) {
-        const owner = listing.ownerAddr || listing[0];
+        const owner = listing.carOwner || listing[0];
         const dailyPrice = listing.dailyPrice || listing[1];
         const deposit = listing.securityDeposit || listing[2];
         const active =
@@ -107,13 +107,13 @@ class ContractService {
      * Check if listing exists (not zero address and has price)
      */
     _isValidListing(listing) {
-        const ownerAddr = listing.ownerAddr || listing[0];
+        const carOwner = listing.carOwner || listing[0];
         const dailyPrice = listing.dailyPrice || listing[1];
 
         return (
-            ownerAddr &&
-            ownerAddr !== "0x0000000000000000000000000000000000000000" &&
-            ownerAddr !== "0x" &&
+            carOwner &&
+            carOwner !== "0x0000000000000000000000000000000000000000" &&
+            carOwner !== "0x" &&
             (!dailyPrice || BigInt(dailyPrice.toString()) !== 0n)
         );
     }
@@ -534,7 +534,7 @@ class ContractService {
                 const isRenter =
                     booking.renter.toLowerCase() === account.toLowerCase();
                 const isOwner =
-                    (listing.ownerAddr || listing[0]).toLowerCase() ===
+                    (listing.carOwner || listing[0]).toLowerCase() ===
                     account.toLowerCase();
 
                 if (isRenter || isOwner) {
