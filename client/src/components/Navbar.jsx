@@ -196,6 +196,30 @@ export const Navbar = () => {
                             >
                                 List Your Car
                             </Link>
+                            {isRegistered && (
+                                <>
+                                    <Link
+                                        to="/renter/bookings"
+                                        className={`px-2 py-1 ${
+                                            currentPath === "/renter/bookings"
+                                                ? "text-purple-600 font-semibold border-b-2 border-purple-600"
+                                                : "text-gray-600 hover:text-indigo-600"
+                                        }`}
+                                    >
+                                        My Bookings
+                                    </Link>
+                                    <Link
+                                        to="/owner/bookings"
+                                        className={`px-2 py-1 ${
+                                            currentPath === "/owner/bookings"
+                                                ? "text-indigo-600 font-semibold border-b-2 border-indigo-600"
+                                                : "text-gray-600 hover:text-indigo-600"
+                                        }`}
+                                    >
+                                        Owner Bookings
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
 

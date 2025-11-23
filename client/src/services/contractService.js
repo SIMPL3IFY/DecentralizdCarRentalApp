@@ -531,17 +531,18 @@ class ContractService {
                     .listings(booking.listingId)
                     .call();
 
+                // Parse listing first to get the owner reliably
+                const parsedListing = this._parseListing(
+                    listing,
+                    Number(booking.listingId)
+                );
+
                 const isRenter =
                     booking.renter.toLowerCase() === account.toLowerCase();
                 const isOwner =
-                    (listing.carOwner || listing[0]).toLowerCase() ===
-                    account.toLowerCase();
+                    parsedListing.owner.toLowerCase() === account.toLowerCase();
 
                 if (isRenter || isOwner) {
-                    const parsedListing = this._parseListing(
-                        listing,
-                        Number(booking.listingId)
-                    );
                     const parsedBooking = this._parseBooking(
                         booking,
                         i,
