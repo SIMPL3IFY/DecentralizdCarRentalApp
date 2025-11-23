@@ -32,38 +32,7 @@ export const HomePage = () => {
                         </Link>
                     </div>
                 </div>
-
-                <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="bg-white rounded-xl shadow-lg p-6">
-                        <div className="text-4xl mb-4">🔐</div>
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                            Secure
-                        </h3>
-                        <p className="text-gray-600">
-                            Powered by blockchain technology and smart contracts
-                            for secure transactions
-                        </p>
-                    </div>
-                    <div className="bg-white rounded-xl shadow-lg p-6">
-                        <div className="text-4xl mb-4">💎</div>
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                            Transparent
-                        </h3>
-                        <p className="text-gray-600">
-                            All transactions are recorded on the blockchain for
-                            complete transparency
-                        </p>
-                    </div>
-                    <div className="bg-white rounded-xl shadow-lg p-6">
-                        <div className="text-4xl mb-4">⚡</div>
-                        <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                            Fast
-                        </h3>
-                        <p className="text-gray-600">
-                            Instant bookings and payments without intermediaries
-                        </p>
-                    </div>
-                </div>
+              
             </div>
         </div>
     );
