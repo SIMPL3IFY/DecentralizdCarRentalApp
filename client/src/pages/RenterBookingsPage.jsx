@@ -49,7 +49,8 @@ export const RenterBookingsPage = () => {
         openDispute,
         isLoading,
     } = useBookings(contract);
-    const { isRegistered } = useUser(contract);
+    const { isRegistered, isInsuranceVerifier, isArbitrator } =
+        useUser(contract);
     const [filter, setFilter] = useState("all"); // "all" | "pending"
     const [isInitializing, setIsInitializing] = useState(true);
     const [message, setMessage] = useState("");
@@ -131,6 +132,26 @@ export const RenterBookingsPage = () => {
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
                         <p className="text-yellow-800">
                             Please register your account to view bookings.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isInsuranceVerifier || isArbitrator) {
+        const role = isInsuranceVerifier ? "Insurance Verifier" : "Arbitrator";
+        return (
+            <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                        <p className="text-red-800">
+                            You do not have Owner/Renter permissions. This page
+                            is only accessible to Owners and Renters.
+                        </p>
+                        <p className="text-sm text-red-600 mt-2">
+                            Your role: {role}
                         </p>
                     </div>
                 </div>

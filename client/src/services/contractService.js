@@ -448,11 +448,39 @@ class ContractService {
     // ==================== Booking Functions ====================
 
     /**
+     * Convert date string (YYYY-MM-DD) to Unix timestamp
+     * We interpret the date as "the start of this day in the user's local timezone"
+     * then convert to UTC timestamp. This ensures that when a user selects "tomorrow"
+     * in their timezone, it's correctly represented.
+     *
+     * For example, if user in PST (UTC-8) selects 2025-11-24:
+     * - Local: 2025-11-24 00:00:00 PST
+     * - UTC: 2025-11-24 08:00:00 UTC
+     * - This ensures the booking starts at the beginning of that day in their timezone
+     */
+    _dateToTimestamp(dateString) {
+        // Parse date string - when you do new Date("YYYY-MM-DD"), it's interpreted as local midnight
+        // But to be explicit, we'll create it at local midnight
+        const [year, month, day] = dateString.split("-").map(Number);
+        const date = new Date(year, month - 1, day, 0, 0, 0, 0); // Local midnight
+        const timestamp = Math.floor(date.getTime() / 1000);
+
+        // Debug logging
+        console.log(
+            `Date conversion: ${dateString} (local) -> ${timestamp} (${new Date(
+                timestamp * 1000
+            ).toISOString()} UTC)`
+        );
+
+        return timestamp;
+    }
+
+    /**
      * Calculate escrow amount for booking
      */
     calculateEscrow(listing, startDate, endDate) {
-        const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-        const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+        const startTimestamp = this._dateToTimestamp(startDate);
+        const endTimestamp = this._dateToTimestamp(endDate);
         const days = Math.floor((endTimestamp - startTimestamp) / 86400);
 
         if (days < 1) {
@@ -477,6 +505,8 @@ class ContractService {
      */
     async requestBooking(listingId, startDate, endDate) {
         const account = web3Service.getAccount();
+        const web3 = web3Service.getWeb3();
+
         // Get listing to calculate escrow
         const listing = await this.getListing(listingId);
 
@@ -488,12 +518,49 @@ class ContractService {
             throw new Error("Listing is inactive");
         }
 
+        // Convert dates to timestamps (midnight UTC)
+        const startTimestamp = this._dateToTimestamp(startDate);
+        const endTimestamp = this._dateToTimestamp(endDate);
+
+        // Get current block timestamp to validate
+        const latestBlock = await web3.eth.getBlock("latest");
+        const currentTimestamp = Number(latestBlock.timestamp);
+
+        // Debug logging
+        console.log(
+            `Current block timestamp: ${currentTimestamp} (${new Date(
+                currentTimestamp * 1000
+            ).toISOString()})`
+        );
+        console.log(
+            `Start timestamp: ${startTimestamp} (${new Date(
+                startTimestamp * 1000
+            ).toISOString()})`
+        );
+        console.log(`Difference: ${startTimestamp - currentTimestamp} seconds`);
+
+        // Validate start date is in the future
+        // The contract uses >= so we need startTimestamp >= block.timestamp
+        // Add a 120 second buffer to account for transaction processing time and clock drift
+        const bufferSeconds = 120;
+        if (startTimestamp < currentTimestamp + bufferSeconds) {
+            const selectedDate = new Date(startTimestamp * 1000).toISOString();
+            const currentDate = new Date(currentTimestamp * 1000).toISOString();
+            const hoursAhead = (
+                (currentTimestamp + bufferSeconds - startTimestamp) /
+                3600
+            ).toFixed(2);
+            throw new Error(
+                `Start date must be in the future. ` +
+                    `Selected date: ${selectedDate}, ` +
+                    `Current time: ${currentDate}. ` +
+                    `The selected date is ${hoursAhead} hours in the past. ` +
+                    `Please select a date that is at least 2 minutes in the future.`
+            );
+        }
+
         // Calculate escrow
         const { escrow } = this.calculateEscrow(listing, startDate, endDate);
-
-        // Convert dates to timestamps
-        const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-        const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
 
         const tx = await this.contract.methods
             .requestBooking(listingId, startTimestamp, endTimestamp)

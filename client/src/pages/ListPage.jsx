@@ -8,7 +8,12 @@ import { contractService } from "../services/contractService";
 
 export const ListPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
-    const { isRegistered, checkRegistration } = useUser(contract);
+    const {
+        isRegistered,
+        isInsuranceVerifier,
+        isArbitrator,
+        checkRegistration,
+    } = useUser(contract);
     const { createListing, isLoading: isCreatingListing } =
         useListings(contract);
 
@@ -151,6 +156,26 @@ export const ListPage = () => {
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
                         <p className="text-gray-600">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isRegistered && (isInsuranceVerifier || isArbitrator)) {
+        const role = isInsuranceVerifier ? "Insurance Verifier" : "Arbitrator";
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-100">
+                <Navbar />
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                        <p className="text-red-800">
+                            You do not have Owner/Renter permissions. This page
+                            is only accessible to Owners and Renters.
+                        </p>
+                        <p className="text-sm text-red-600 mt-2">
+                            Your role: {role}
+                        </p>
                     </div>
                 </div>
             </div>

@@ -5,6 +5,8 @@ import { RentPage } from "./pages/RentPage";
 import { ListPage } from "./pages/ListPage";
 import { OwnerBookingsPage } from "./pages/OwnerBookingsPage";
 import { RenterBookingsPage } from "./pages/RenterBookingsPage";
+import { InsuranceVerifierPage } from "./pages/InsuranceVerifierPage";
+import { ArbitratorPage } from "./pages/ArbitratorPage";
 import DevPage from "./pages/DevPage";
 
 export default function App() {
@@ -19,6 +21,11 @@ export default function App() {
                     path="/renter/bookings"
                     element={<RenterBookingsPage />}
                 />
+                <Route
+                    path="/insurance/verify"
+                    element={<InsuranceVerifierPage />}
+                />
+                <Route path="/arbitrator" element={<ArbitratorPage />} />
                 <Route path="/dev" element={<DevPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
