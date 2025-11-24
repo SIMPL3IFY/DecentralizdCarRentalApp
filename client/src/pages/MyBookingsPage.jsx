@@ -33,7 +33,7 @@ const isRenterPending = (booking) => {
     return false;
 };
 
-export const RenterBookingsPage = () => {
+export const MyBookingsPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
     const {
         bookings,

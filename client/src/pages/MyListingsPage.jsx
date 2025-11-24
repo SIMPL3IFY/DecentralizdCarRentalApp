@@ -34,7 +34,7 @@ const isOwnerPending = (booking) => {
     return false;
 };
 
-export const OwnerBookingsPage = () => {
+export const MyListingsPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
     const {
         bookings,
