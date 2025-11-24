@@ -6,6 +6,7 @@ import { useListings } from "../hooks/useListings";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
 import { contractService } from "../services/contractService";
+import { InsuranceStatus } from "../constants/insuranceStatus";
 import {
     getStatusName,
     getStatusColor,
@@ -137,11 +138,17 @@ export const OwnerBookingsPage = () => {
 
     // Categorize listings
     const pendingInsuranceListings = listingsWithBookings.filter(
-        (listing) => !listing.insuranceValid
+        (listing) => listing.insuranceStatus === InsuranceStatus.Pending
     );
 
     const verifiedListings = listingsWithBookings.filter(
-        (listing) => listing.insuranceValid && listing.active
+        (listing) =>
+            listing.insuranceStatus === InsuranceStatus.Approved &&
+            listing.active
+    );
+
+    const rejectedInsuranceListings = listingsWithBookings.filter(
+        (listing) => listing.insuranceStatus === InsuranceStatus.Rejected
     );
 
     // Apply filter to listings
@@ -266,9 +273,75 @@ export const OwnerBookingsPage = () => {
                                     </div>
                                     {listing.location && (
                                         <p className="text-sm text-gray-600 mb-3">
-                                            📍 {listing.location}
+                                            {listing.location}
                                         </p>
                                     )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                        <div>
+                                            <p className="text-sm text-gray-600">
+                                                Daily Price
+                                            </p>
+                                            <p className="font-semibold">
+                                                {listing.dailyPrice} ETH
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">
+                                                Security Deposit
+                                            </p>
+                                            <p className="font-semibold">
+                                                {listing.deposit} ETH
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-4">
+                                        Listing ID: {listing.id}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Rejected Insurance Section */}
+                {rejectedInsuranceListings.length > 0 && (
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                            Rejected Insurance Verification
+                        </h2>
+                        <div className="space-y-4">
+                            {rejectedInsuranceListings.map((listing) => (
+                                <div
+                                    key={listing.id}
+                                    className="bg-red-50 border-2 border-red-300 rounded-lg p-6"
+                                >
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <p className="font-semibold text-lg">
+                                            {listing.make && listing.model
+                                                ? `${listing.make} ${
+                                                      listing.model
+                                                  }${
+                                                      listing.year
+                                                          ? ` (${listing.year})`
+                                                          : ""
+                                                  }`
+                                                : `Listing #${listing.id}`}
+                                        </p>
+                                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-200 text-red-800">
+                                            Insurance Rejected
+                                        </span>
+                                    </div>
+                                    {listing.location && (
+                                        <p className="text-sm text-gray-600 mb-3">
+                                            �� {listing.location}
+                                        </p>
+                                    )}
+                                    <p className="text-sm text-red-700 mb-3">
+                                        Your insurance verification was
+                                        rejected. Please update your insurance
+                                        documentation and contact the verifier
+                                        for re-verification.
+                                    </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                         <div>
                                             <p className="text-sm text-gray-600">
@@ -402,7 +475,7 @@ export const OwnerBookingsPage = () => {
                                                 </div>
                                                 {listing.location && (
                                                     <p className="text-sm text-gray-600 mb-3">
-                                                        📍 {listing.location}
+                                                        {listing.location}
                                                     </p>
                                                 )}
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,7 +549,9 @@ export const OwnerBookingsPage = () => {
                                                                         Renter
                                                                     </p>
                                                                     <p className="font-mono text-sm">
-                                                                        {booking.renter}
+                                                                        {
+                                                                            booking.renter
+                                                                        }
                                                                     </p>
                                                                 </div>
                                                             </div>

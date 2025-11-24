@@ -4,6 +4,7 @@ import { useBookings } from "../hooks/useBookings";
 import { useUser } from "../hooks/useUser";
 import { contractService } from "../services/contractService";
 import { web3Service } from "../services/web3Service";
+import { InsuranceStatus } from "../constants/insuranceStatus";
 import {
     getStatusName,
     getStatusColor,
@@ -313,13 +314,19 @@ export const OwnerDashboard = ({ contract, log }) => {
                                                     Inactive
                                                 </span>
                                             )}
-                                            {listing.insuranceValid ? (
-                                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                                                    Insurance Verified
+                                            {listing.insuranceStatus ===
+                                            InsuranceStatus.Approved ? (
+                                                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                                                    Insurance Approved
+                                                </span>
+                                            ) : listing.insuranceStatus ===
+                                              InsuranceStatus.Rejected ? (
+                                                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">
+                                                    Insurance Rejected
                                                 </span>
                                             ) : (
-                                                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded">
-                                                    Insurance Not Verified
+                                                <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
+                                                    Insurance Pending
                                                 </span>
                                             )}
                                         </div>

@@ -47,12 +47,18 @@ contract CarRental {
 
     /* =============================== Listings ============================= */
 
+    enum InsuranceStatus {
+        Pending,    // 0 - never verified
+        Approved,   // 1 - verified and valid
+        Rejected    // 2 - explicitly rejected
+    }
+
     struct Listing {
         address payable carOwner;         // car owner (listing creator)
         uint256 dailyPrice;        // in wei per day
         uint256 securityDeposit;   // in wei
         bool    active;            // car owner can pause/unpause
-        bool    insuranceValid;    // set by InsuranceVerifier
+        InsuranceStatus insuranceStatus;  // Changed from bool insuranceValid
         string  insuranceDocURI;   // optional
         string  make;              // car make/brand
         string  model;             // car model
@@ -85,7 +91,7 @@ contract CarRental {
             dailyPrice: dailyPrice,
             securityDeposit: securityDeposit,
             active: true,
-            insuranceValid: false,
+            insuranceStatus: InsuranceStatus.Pending,  // Changed
             insuranceDocURI: insuranceDocURI,
             make: make,
             model: model,
@@ -128,7 +134,9 @@ contract CarRental {
     }
 
     function verifyInsurance(uint256 listingId, bool valid) external onlyInsurance {
-        listings[listingId].insuranceValid = valid;
+        listings[listingId].insuranceStatus = valid 
+            ? InsuranceStatus.Approved 
+            : InsuranceStatus.Rejected;
         emit InsuranceVerified(listingId, valid);
     }
 
@@ -254,7 +262,10 @@ contract CarRental {
         Listing storage L = listings[listingId];
         require(msg.sender != L.carOwner, "cannot book own listing");
         require(L.active, "listing inactive");
-        require(L.insuranceValid, "insurance not valid");
+        require(
+            L.insuranceStatus == InsuranceStatus.Approved, 
+            "insurance not approved"
+        );
         require(startDate >= block.timestamp, "start date must be in the future");
         uint256 numDays = daysBetween(startDate, endDate);
         require(numDays > 0, "min 1 day");

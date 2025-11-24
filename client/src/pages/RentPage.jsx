@@ -7,6 +7,7 @@ import { useBookings } from "../hooks/useBookings";
 import { contractService } from "../services/contractService";
 import { web3Service } from "../services/web3Service";
 import { CONTRACT_ADDRESS } from "../constants/config";
+import { InsuranceStatus } from "../constants/insuranceStatus";
 
 export const RentPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
@@ -76,9 +77,11 @@ export const RentPage = () => {
         calculateEscrow();
     }, [selectedListing, bookingForm.startDate, bookingForm.endDate]);
 
-    // Filter only active and insurance-valid listings
+    // Filter only active and insurance-approved listings
     const availableListings = listings.filter(
-        (listing) => listing.active && listing.insuranceValid
+        (listing) =>
+            listing.active &&
+            listing.insuranceStatus === InsuranceStatus.Approved
     );
 
     // Generate placeholder image URL based on car make/model

@@ -1,6 +1,7 @@
 import { web3Service } from "./web3Service";
 import { CONTRACT_ABI_PATH, GAS_LIMITS } from "../constants/config";
 import { BookingStatus } from "../constants/bookingStatus";
+import { InsuranceStatus } from "../constants/insuranceStatus";
 
 /**
  * CarRental Contract Service
@@ -74,10 +75,13 @@ class ContractService {
         const deposit = listing.securityDeposit || listing[2];
         const active =
             listing.active !== undefined ? listing.active : listing[3];
-        const insuranceValid =
-            listing.insuranceValid !== undefined
-                ? listing.insuranceValid
-                : listing[4];
+        // Parse insuranceStatus enum (0 = Pending, 1 = Approved, 2 = Rejected)
+        const insuranceStatus =
+            listing.insuranceStatus !== undefined
+                ? Number(listing.insuranceStatus)
+                : listing[4] !== undefined
+                ? Number(listing[4])
+                : InsuranceStatus.Pending;
         const insuranceDocURI = listing.insuranceDocURI || listing[5] || "";
         const make = listing.make || listing[6] || "";
         const model = listing.model || listing[7] || "";
@@ -94,7 +98,9 @@ class ContractService {
             dailyPrice: web3Service.fromWei(dailyPrice.toString(), "ether"),
             deposit: web3Service.fromWei(deposit.toString(), "ether"),
             active: Boolean(active),
-            insuranceValid: Boolean(insuranceValid),
+            insuranceStatus: insuranceStatus,
+            // Keep insuranceValid for backward compatibility (true if Approved)
+            insuranceValid: insuranceStatus === InsuranceStatus.Approved,
             insuranceDocURI,
             make,
             model,
@@ -509,8 +515,8 @@ class ContractService {
         const listing = await this.getListing(listingId);
 
         // Validate listing
-        if (!listing.insuranceValid) {
-            throw new Error("Listing insurance not verified");
+        if (listing.insuranceStatus !== InsuranceStatus.Approved) {
+            throw new Error("Listing insurance not approved");
         }
         if (!listing.active) {
             throw new Error("Listing is inactive");

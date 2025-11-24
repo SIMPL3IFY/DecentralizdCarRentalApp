@@ -274,7 +274,7 @@ export const RenterBookingsPage = () => {
 
                                         {booking.listing?.location && (
                                             <p className="text-sm text-gray-600 mb-3">
-                                                📍 {booking.listing.location}
+                                                {booking.listing.location}
                                             </p>
                                         )}
 

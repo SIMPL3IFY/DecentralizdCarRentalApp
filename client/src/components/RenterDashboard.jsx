@@ -4,6 +4,7 @@ import { useBookings } from "../hooks/useBookings";
 import { useUser } from "../hooks/useUser";
 import { contractService } from "../services/contractService";
 import { web3Service } from "../services/web3Service";
+import { InsuranceStatus } from "../constants/insuranceStatus";
 import {
     getStatusName,
     getStatusColor,
@@ -127,10 +128,10 @@ export const RenterDashboard = ({ contract, log }) => {
 
     const currentAccount = web3Service.getAccount()?.toLowerCase();
 
-    // Show all active, verified listings (including own listings),
+    // Show all active, approved listings (including own listings),
     // and optionally highlight or note if the listing is owned by the current account.
     const availableListings = listings.filter(
-        (l) => l.active && l.insuranceValid
+        (l) => l.active && l.insuranceStatus === InsuranceStatus.Approved
     );
 
     // Filter bookings to only show those for the current account
