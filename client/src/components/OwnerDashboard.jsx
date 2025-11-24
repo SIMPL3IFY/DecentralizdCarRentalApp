@@ -384,8 +384,8 @@ export const OwnerDashboard = ({ contract, log }) => {
                                             </p>
                                         )}
                                         <p className="mt-2">
-                                            Renter:{" "}
-                                            {booking.renter.slice(0, 10)}...
+                                            Renter:
+                                            {booking.renter}
                                         </p>
                                         <p>
                                             Status:{" "}
@@ -443,45 +443,21 @@ export const OwnerDashboard = ({ contract, log }) => {
                                             </>
                                         )}
                                         {booking.status ===
-                                            BookingStatus.Approved &&
-                                            !booking.ownerPickup && (
-                                                <button
-                                                    onClick={async () => {
-                                                        const result =
-                                                            await confirmPickup(
-                                                                booking.id
-                                                            );
-                                                        if (result.success)
-                                                            log(
-                                                                `Pickup confirmed`
-                                                            );
-                                                    }}
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                                                >
-                                                    Confirm Pickup
-                                                </button>
-                                            )}
-                                        {(booking.status ===
-                                            BookingStatus.Active ||
-                                            booking.status ===
-                                                BookingStatus.ReturnPending) &&
-                                            !booking.ownerReturn && (
-                                                <button
-                                                    onClick={async () => {
-                                                        const result =
-                                                            await confirmReturn(
-                                                                booking.id
-                                                            );
-                                                        if (result.success)
-                                                            log(
-                                                                `Return confirmed`
-                                                            );
-                                                    }}
-                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                                                >
-                                                    Confirm Return
-                                                </button>
-                                            )}
+                                            BookingStatus.Active && (
+                                            <button
+                                                onClick={async () => {
+                                                    const result =
+                                                        await confirmReturn(
+                                                            booking.id
+                                                        );
+                                                    if (result.success)
+                                                        log(`Return confirmed`);
+                                                }}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                                            >
+                                                Confirm Return
+                                            </button>
+                                        )}
                                         {canOpenDispute(booking.status) &&
                                             booking.status !==
                                                 BookingStatus.Disputed && (

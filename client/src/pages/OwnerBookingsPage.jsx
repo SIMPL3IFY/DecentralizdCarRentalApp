@@ -25,13 +25,8 @@ const isOwnerPending = (booking) => {
         return true;
     }
 
-    // Approved - needs pickup confirmation
-    if (statusNum === BookingStatus.Approved && !booking.ownerPickup) {
-        return true;
-    }
-
-    // ReturnPending - needs return confirmation
-    if (statusNum === BookingStatus.ReturnPending && !booking.ownerReturn) {
+    // Active - needs return confirmation (only owner can confirm return)
+    if (statusNum === BookingStatus.Active) {
         return true;
     }
 
@@ -463,19 +458,29 @@ export const OwnerBookingsPage = () => {
                                                                     )}
                                                                 </span>
                                                             </div>
-                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 mb-3">
+                                                                <div>
+                                                                    <p className="text-sm text-gray-600">
+                                                                        Booking
+                                                                        Dates
+                                                                    </p>
+                                                                    <p className="font-semibold text-sm">
+                                                                        {booking.startDate &&
+                                                                        booking.endDate
+                                                                            ? `${booking.startDate.toLocaleDateString()} - ${booking.endDate.toLocaleDateString()}`
+                                                                            : "N/A"}
+                                                                    </p>
+                                                                </div>
                                                                 <div>
                                                                     <p className="text-sm text-gray-600">
                                                                         Renter
                                                                     </p>
                                                                     <p className="font-mono text-sm">
-                                                                        {booking.renter?.slice(
-                                                                            0,
-                                                                            10
-                                                                        )}
-                                                                        ...
+                                                                        {booking.renter}
                                                                     </p>
                                                                 </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                                                 <div>
                                                                     <p className="text-sm text-gray-600">
                                                                         Rental
@@ -555,63 +560,32 @@ export const OwnerBookingsPage = () => {
                                                                 </>
                                                             )}
                                                             {booking.status ===
-                                                                BookingStatus.Approved &&
-                                                                !booking.ownerPickup && (
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            const result =
-                                                                                await confirmPickup(
-                                                                                    booking.id
-                                                                                );
-                                                                            if (
-                                                                                result.success
-                                                                            ) {
-                                                                                showMessage(
-                                                                                    "Pickup confirmed"
-                                                                                );
-                                                                                await loadBookings();
-                                                                            } else {
-                                                                                showMessage(
-                                                                                    `Error: ${result.error}`
-                                                                                );
-                                                                            }
-                                                                        }}
-                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                                                                    >
-                                                                        Confirm
-                                                                        Pickup
-                                                                    </button>
-                                                                )}
-                                                            {(booking.status ===
-                                                                BookingStatus.Active ||
-                                                                booking.status ===
-                                                                    BookingStatus.ReturnPending) &&
-                                                                !booking.ownerReturn && (
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            const result =
-                                                                                await confirmReturn(
-                                                                                    booking.id
-                                                                                );
-                                                                            if (
-                                                                                result.success
-                                                                            ) {
-                                                                                showMessage(
-                                                                                    "Return confirmed"
-                                                                                );
-                                                                                await loadBookings();
-                                                                            } else {
-                                                                                showMessage(
-                                                                                    `Error: ${result.error}`
-                                                                                );
-                                                                            }
-                                                                        }}
-                                                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                                                                    >
-                                                                        Confirm
-                                                                        Return
-                                                                    </button>
-                                                                )}
+                                                                BookingStatus.Active && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const result =
+                                                                            await confirmReturn(
+                                                                                booking.id
+                                                                            );
+                                                                        if (
+                                                                            result.success
+                                                                        ) {
+                                                                            showMessage(
+                                                                                "Return confirmed"
+                                                                            );
+                                                                            await loadBookings();
+                                                                        } else {
+                                                                            showMessage(
+                                                                                `Error: ${result.error}`
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                                                                >
+                                                                    Confirm
+                                                                    Return
+                                                                </button>
+                                                            )}
                                                             {canOpenDispute(
                                                                 booking.status
                                                             ) &&

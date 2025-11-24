@@ -147,10 +147,8 @@ class ContractService {
             rentalCost: web3Service.fromWei(booking.rentalCost, "ether"),
             deposit: web3Service.fromWei(booking.deposit, "ether"),
             escrow: web3Service.fromWei(booking.escrow, "ether"),
-            renterPickup: booking.renterPickup,
-            ownerPickup: booking.ownerPickup,
-            renterReturn: booking.renterReturn,
-            ownerReturn: booking.ownerReturn,
+            renterPickup: booking.renterPickup || false,
+            ownerReturn: booking.ownerReturn || false,
         };
 
         if (listing) {
@@ -159,8 +157,8 @@ class ContractService {
 
         if (booking.pickupProofURI_renter !== undefined) {
             baseBooking.pickupProofURI_renter = booking.pickupProofURI_renter;
-            baseBooking.pickupProofURI_owner = booking.pickupProofURI_owner;
-            baseBooking.returnProofURI_renter = booking.returnProofURI_renter;
+        }
+        if (booking.returnProofURI_owner !== undefined) {
             baseBooking.returnProofURI_owner = booking.returnProofURI_owner;
         }
 
