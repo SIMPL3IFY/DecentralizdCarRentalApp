@@ -633,13 +633,13 @@ class ContractService {
 
     /**
      * Get all disputed bookings (for arbitrator)
-     * BookingStatus.Disputed = 8
+     * BookingStatus.Disputed = 7
      */
     async getDisputedBookings() {
         const bookings = [];
         const seenIds = new Set();
         const maxAttempts = 1000;
-        const DISPUTED_STATUS = 8;
+        const DISPUTED_STATUS = BookingStatus.Disputed;
 
         for (let i = 0; i < maxAttempts; i++) {
             try {

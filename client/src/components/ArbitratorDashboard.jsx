@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { contractService } from "../services/contractService";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
@@ -13,13 +13,7 @@ export const ArbitratorDashboard = ({ contract, log }) => {
         renterPayout: "",
     });
 
-    useEffect(() => {
-        if (contract) {
-            loadDisputedBookings();
-        }
-    }, [contract]);
-
-    const loadDisputedBookings = async () => {
+    const loadDisputedBookings = useCallback(async () => {
         if (!contract) return;
         setIsLoading(true);
         try {
@@ -30,7 +24,27 @@ export const ArbitratorDashboard = ({ contract, log }) => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [contract, log]);
+
+    useEffect(() => {
+        if (contract) {
+            loadDisputedBookings();
+        }
+    }, [contract, loadDisputedBookings]);
+
+    // Listen for account changes and reload disputes
+    useEffect(() => {
+        if (!web3Service.isInitialized()) return;
+
+        const unsubscribe = web3Service.onAccountChange((newAccount) => {
+            if (contract && newAccount) {
+                console.log("Account changed, reloading disputes...");
+                loadDisputedBookings();
+            }
+        });
+
+        return unsubscribe;
+    }, [contract, loadDisputedBookings]);
 
     const handleResolveDispute = async (e) => {
         e.preventDefault();
