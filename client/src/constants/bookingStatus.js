@@ -6,11 +6,10 @@ export const BookingStatus = {
     Requested: 1,
     Approved: 2,
     Active: 3,
-    ReturnPending: 4,
-    Completed: 5,
-    Rejected: 6,
-    Cancelled: 7,
-    Disputed: 8,
+    Completed: 4,
+    Rejected: 5,
+    Cancelled: 6,
+    Disputed: 7,
 };
 
 /**
@@ -37,8 +36,6 @@ export const getStatusColor = (status) => {
             return "bg-blue-100 text-blue-800";
         case BookingStatus.Active:
             return "bg-green-100 text-green-800";
-        case BookingStatus.ReturnPending:
-            return "bg-orange-100 text-orange-800";
         case BookingStatus.Completed:
             return "bg-gray-100 text-gray-800";
         case BookingStatus.Rejected:
@@ -68,10 +65,7 @@ export const canCancel = (status) => {
  */
 export const isActive = (status) => {
     const statusNum = Number(status);
-    return (
-        statusNum === BookingStatus.Active ||
-        statusNum === BookingStatus.ReturnPending
-    );
+    return statusNum === BookingStatus.Active;
 };
 
 /**
@@ -81,7 +75,6 @@ export const canOpenDispute = (status) => {
     const statusNum = Number(status);
     return (
         statusNum === BookingStatus.Approved ||
-        statusNum === BookingStatus.Active ||
-        statusNum === BookingStatus.ReturnPending
+        statusNum === BookingStatus.Active
     );
 };

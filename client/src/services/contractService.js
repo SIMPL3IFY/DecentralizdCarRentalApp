@@ -1,6 +1,7 @@
 import { web3Service } from "./web3Service";
 import { CONTRACT_ABI_PATH, GAS_LIMITS } from "../constants/config";
 import { BookingStatus } from "../constants/bookingStatus";
+import { InsuranceStatus } from "../constants/insuranceStatus";
 
 /**
  * CarRental Contract Service
@@ -74,10 +75,13 @@ class ContractService {
         const deposit = listing.securityDeposit || listing[2];
         const active =
             listing.active !== undefined ? listing.active : listing[3];
-        const insuranceValid =
-            listing.insuranceValid !== undefined
-                ? listing.insuranceValid
-                : listing[4];
+        // Parse insuranceStatus enum (0 = Pending, 1 = Approved, 2 = Rejected)
+        const insuranceStatus =
+            listing.insuranceStatus !== undefined
+                ? Number(listing.insuranceStatus)
+                : listing[4] !== undefined
+                ? Number(listing[4])
+                : InsuranceStatus.Pending;
         const insuranceDocURI = listing.insuranceDocURI || listing[5] || "";
         const make = listing.make || listing[6] || "";
         const model = listing.model || listing[7] || "";
@@ -94,7 +98,9 @@ class ContractService {
             dailyPrice: web3Service.fromWei(dailyPrice.toString(), "ether"),
             deposit: web3Service.fromWei(deposit.toString(), "ether"),
             active: Boolean(active),
-            insuranceValid: Boolean(insuranceValid),
+            insuranceStatus: insuranceStatus,
+            // Keep insuranceValid for backward compatibility (true if Approved)
+            insuranceValid: insuranceStatus === InsuranceStatus.Approved,
             insuranceDocURI,
             make,
             model,
@@ -147,10 +153,8 @@ class ContractService {
             rentalCost: web3Service.fromWei(booking.rentalCost, "ether"),
             deposit: web3Service.fromWei(booking.deposit, "ether"),
             escrow: web3Service.fromWei(booking.escrow, "ether"),
-            renterPickup: booking.renterPickup,
-            ownerPickup: booking.ownerPickup,
-            renterReturn: booking.renterReturn,
-            ownerReturn: booking.ownerReturn,
+            renterPickup: booking.renterPickup || false,
+            ownerReturn: booking.ownerReturn || false,
         };
 
         if (listing) {
@@ -159,8 +163,8 @@ class ContractService {
 
         if (booking.pickupProofURI_renter !== undefined) {
             baseBooking.pickupProofURI_renter = booking.pickupProofURI_renter;
-            baseBooking.pickupProofURI_owner = booking.pickupProofURI_owner;
-            baseBooking.returnProofURI_renter = booking.returnProofURI_renter;
+        }
+        if (booking.returnProofURI_owner !== undefined) {
             baseBooking.returnProofURI_owner = booking.returnProofURI_owner;
         }
 
@@ -448,11 +452,39 @@ class ContractService {
     // ==================== Booking Functions ====================
 
     /**
+     * Convert date string (YYYY-MM-DD) to Unix timestamp
+     * We interpret the date as "the start of this day in the user's local timezone"
+     * then convert to UTC timestamp. This ensures that when a user selects "tomorrow"
+     * in their timezone, it's correctly represented.
+     *
+     * For example, if user in PST (UTC-8) selects 2025-11-24:
+     * - Local: 2025-11-24 00:00:00 PST
+     * - UTC: 2025-11-24 08:00:00 UTC
+     * - This ensures the booking starts at the beginning of that day in their timezone
+     */
+    _dateToTimestamp(dateString) {
+        // Parse date string - when you do new Date("YYYY-MM-DD"), it's interpreted as local midnight
+        // But to be explicit, we'll create it at local midnight
+        const [year, month, day] = dateString.split("-").map(Number);
+        const date = new Date(year, month - 1, day, 0, 0, 0, 0); // Local midnight
+        const timestamp = Math.floor(date.getTime() / 1000);
+
+        // Debug logging
+        console.log(
+            `Date conversion: ${dateString} (local) -> ${timestamp} (${new Date(
+                timestamp * 1000
+            ).toISOString()} UTC)`
+        );
+
+        return timestamp;
+    }
+
+    /**
      * Calculate escrow amount for booking
      */
     calculateEscrow(listing, startDate, endDate) {
-        const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-        const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+        const startTimestamp = this._dateToTimestamp(startDate);
+        const endTimestamp = this._dateToTimestamp(endDate);
         const days = Math.floor((endTimestamp - startTimestamp) / 86400);
 
         if (days < 1) {
@@ -477,23 +509,62 @@ class ContractService {
      */
     async requestBooking(listingId, startDate, endDate) {
         const account = web3Service.getAccount();
+        const web3 = web3Service.getWeb3();
+
         // Get listing to calculate escrow
         const listing = await this.getListing(listingId);
 
         // Validate listing
-        if (!listing.insuranceValid) {
-            throw new Error("Listing insurance not verified");
+        if (listing.insuranceStatus !== InsuranceStatus.Approved) {
+            throw new Error("Listing insurance not approved");
         }
         if (!listing.active) {
             throw new Error("Listing is inactive");
         }
 
+        // Convert dates to timestamps (midnight UTC)
+        const startTimestamp = this._dateToTimestamp(startDate);
+        const endTimestamp = this._dateToTimestamp(endDate);
+
+        // Get current block timestamp to validate
+        const latestBlock = await web3.eth.getBlock("latest");
+        const currentTimestamp = Number(latestBlock.timestamp);
+
+        // Debug logging
+        console.log(
+            `Current block timestamp: ${currentTimestamp} (${new Date(
+                currentTimestamp * 1000
+            ).toISOString()})`
+        );
+        console.log(
+            `Start timestamp: ${startTimestamp} (${new Date(
+                startTimestamp * 1000
+            ).toISOString()})`
+        );
+        console.log(`Difference: ${startTimestamp - currentTimestamp} seconds`);
+
+        // Validate start date is in the future
+        // The contract uses >= so we need startTimestamp >= block.timestamp
+        // Add a 120 second buffer to account for transaction processing time and clock drift
+        const bufferSeconds = 120;
+        if (startTimestamp < currentTimestamp + bufferSeconds) {
+            const selectedDate = new Date(startTimestamp * 1000).toISOString();
+            const currentDate = new Date(currentTimestamp * 1000).toISOString();
+            const hoursAhead = (
+                (currentTimestamp + bufferSeconds - startTimestamp) /
+                3600
+            ).toFixed(2);
+            throw new Error(
+                `Start date must be in the future. ` +
+                    `Selected date: ${selectedDate}, ` +
+                    `Current time: ${currentDate}. ` +
+                    `The selected date is ${hoursAhead} hours in the past. ` +
+                    `Please select a date that is at least 2 minutes in the future.`
+            );
+        }
+
         // Calculate escrow
         const { escrow } = this.calculateEscrow(listing, startDate, endDate);
-
-        // Convert dates to timestamps
-        const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-        const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
 
         const tx = await this.contract.methods
             .requestBooking(listingId, startTimestamp, endTimestamp)
@@ -531,17 +602,18 @@ class ContractService {
                     .listings(booking.listingId)
                     .call();
 
+                // Parse listing first to get the owner reliably
+                const parsedListing = this._parseListing(
+                    listing,
+                    Number(booking.listingId)
+                );
+
                 const isRenter =
                     booking.renter.toLowerCase() === account.toLowerCase();
                 const isOwner =
-                    (listing.carOwner || listing[0]).toLowerCase() ===
-                    account.toLowerCase();
+                    parsedListing.owner.toLowerCase() === account.toLowerCase();
 
                 if (isRenter || isOwner) {
-                    const parsedListing = this._parseListing(
-                        listing,
-                        Number(booking.listingId)
-                    );
                     const parsedBooking = this._parseBooking(
                         booking,
                         i,
@@ -561,13 +633,13 @@ class ContractService {
 
     /**
      * Get all disputed bookings (for arbitrator)
-     * BookingStatus.Disputed = 8
+     * BookingStatus.Disputed = 7
      */
     async getDisputedBookings() {
         const bookings = [];
         const seenIds = new Set();
         const maxAttempts = 1000;
-        const DISPUTED_STATUS = 8;
+        const DISPUTED_STATUS = BookingStatus.Disputed;
 
         for (let i = 0; i < maxAttempts; i++) {
             try {

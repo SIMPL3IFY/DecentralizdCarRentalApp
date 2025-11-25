@@ -176,26 +176,90 @@ export const Navbar = () => {
                             CarRental
                         </Link>
                         <div className="flex space-x-4">
-                            <Link
-                                to="/rent"
-                                className={`px-2 py-1 ${
-                                    currentPath === "/rent"
-                                        ? "text-purple-600 font-semibold border-b-2 border-purple-600"
-                                        : "text-gray-600 hover:text-indigo-600"
-                                }`}
-                            >
-                                Rent
-                            </Link>
-                            <Link
-                                to="/list"
-                                className={`px-2 py-1 ${
-                                    currentPath === "/list"
-                                        ? "text-indigo-600 font-semibold border-b-2 border-indigo-600"
-                                        : "text-gray-600 hover:text-indigo-600"
-                                }`}
-                            >
-                                List Your Car
-                            </Link>
+                            {isRegistered && isInsuranceVerifier && (
+                                <Link
+                                    to="/insurance/verify"
+                                    className={`px-2 py-1 ${
+                                        currentPath === "/insurance/verify"
+                                            ? "text-blue-600 font-semibold border-b-2 border-blue-600"
+                                            : "text-gray-600 hover:text-blue-600"
+                                    }`}
+                                >
+                                    Verify Insurance
+                                </Link>
+                            )}
+                            {isRegistered && isArbitrator && (
+                                <Link
+                                    to="/arbitrator"
+                                    className={`px-2 py-1 ${
+                                        currentPath === "/arbitrator"
+                                            ? "text-purple-600 font-semibold border-b-2 border-purple-600"
+                                            : "text-gray-600 hover:text-purple-600"
+                                    }`}
+                                >
+                                    Resolve Disputes
+                                </Link>
+                            )}
+                            {isRegistered &&
+                                !isInsuranceVerifier &&
+                                !isArbitrator && (
+                                    <>
+                                        <Link
+                                            to="/rent"
+                                            className={`px-2 py-1 ${
+                                                currentPath === "/rent"
+                                                    ? "text-purple-600 font-semibold border-b-2 border-purple-600"
+                                                    : "text-gray-600 hover:text-indigo-600"
+                                            }`}
+                                        >
+                                            Rent
+                                        </Link>
+                                        <Link
+                                            to="/list"
+                                            className={`px-2 py-1 ${
+                                                currentPath === "/list"
+                                                    ? "text-indigo-600 font-semibold border-b-2 border-indigo-600"
+                                                    : "text-gray-600 hover:text-indigo-600"
+                                            }`}
+                                        >
+                                            List Your Car
+                                        </Link>
+                                        <Link
+                                            to="/renter/bookings"
+                                            className={`px-2 py-1 ${
+                                                currentPath ===
+                                                "/renter/bookings"
+                                                    ? "text-purple-600 font-semibold border-b-2 border-purple-600"
+                                                    : "text-gray-600 hover:text-indigo-600"
+                                            }`}
+                                        >
+                                            My Bookings
+                                        </Link>
+                                        <Link
+                                            to="/owner/bookings"
+                                            className={`px-2 py-1 ${
+                                                currentPath ===
+                                                "/owner/bookings"
+                                                    ? "text-indigo-600 font-semibold border-b-2 border-indigo-600"
+                                                    : "text-gray-600 hover:text-indigo-600"
+                                            }`}
+                                        >
+                                            My Listings
+                                        </Link>
+                                    </>
+                                )}
+                            {!isRegistered && (
+                                <Link
+                                    to="/rent"
+                                    className={`px-2 py-1 ${
+                                        currentPath === "/rent"
+                                            ? "text-purple-600 font-semibold border-b-2 border-purple-600"
+                                            : "text-gray-600 hover:text-indigo-600"
+                                    }`}
+                                >
+                                    Rent
+                                </Link>
+                            )}
                         </div>
                     </div>
 
