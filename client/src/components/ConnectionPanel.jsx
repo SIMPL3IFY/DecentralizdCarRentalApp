@@ -9,9 +9,12 @@ export const ConnectionPanel = ({
     initError = null,
     isContractLoaded = false,
     contractAddress = null,
+    onLoadContract = null,
 }) => {
     const [availableAccounts, setAvailableAccounts] = useState([]);
     const [isSwitching, setIsSwitching] = useState(false);
+    const [manualContractAddress, setManualContractAddress] = useState("");
+    const [isLoadingContract, setIsLoadingContract] = useState(false);
 
     const handleSwitchAccount = async (newAccount) => {
         if (newAccount === web3Service.getAccount()) {
@@ -41,6 +44,32 @@ export const ConnectionPanel = ({
         };
         loadAccounts();
     }, []);
+
+    const handleLoadContract = async () => {
+        if (!manualContractAddress.trim()) {
+            log("Please enter a contract address");
+            return;
+        }
+        if (!onLoadContract) {
+            log("Load contract function not available");
+            return;
+        }
+        setIsLoadingContract(true);
+        log(`Loading contract at ${manualContractAddress}...`);
+        try {
+            const result = await onLoadContract(manualContractAddress.trim());
+            if (result.success) {
+                log("Contract loaded successfully!");
+                setManualContractAddress("");
+            } else {
+                log(`Failed to load contract: ${result.error}`);
+            }
+        } catch (error) {
+            log(`Error loading contract: ${error.message}`);
+        } finally {
+            setIsLoadingContract(false);
+        }
+    };
 
     const account = web3Service.getAccount();
     const chainId = web3Service.getChainId();
@@ -162,6 +191,34 @@ export const ConnectionPanel = ({
                                 (Loaded)
                             </span>
                         )}
+                    </div>
+                )}
+                {!isContractLoaded && (
+                    <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                        <label className="block font-semibold text-sm text-gray-700 mb-2">
+                            Load Contract Address:
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={manualContractAddress}
+                                onChange={(e) =>
+                                    setManualContractAddress(e.target.value)
+                                }
+                                placeholder="0x..."
+                                className="flex-1 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                            />
+                            <button
+                                onClick={handleLoadContract}
+                                disabled={isLoadingContract || !manualContractAddress.trim()}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                                {isLoadingContract ? "Loading..." : "Load"}
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-2">
+                            Enter the contract address after deployment. Get it from the migration output or check truffle console.
+                        </p>
                     </div>
                 )}
                 {web3Service.isInitialized() &&

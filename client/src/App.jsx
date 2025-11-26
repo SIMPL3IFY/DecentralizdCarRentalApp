@@ -17,10 +17,7 @@ export default function App() {
                 <Route path="/rent" element={<RentPage />} />
                 <Route path="/list" element={<ListPage />} />
                 <Route path="/owner/bookings" element={<MyListingsPage />} />
-                <Route
-                    path="/renter/bookings"
-                    element={<MyBookingsPage />}
-                />
+                <Route path="/renter/bookings" element={<MyBookingsPage />} />
                 <Route
                     path="/insurance/verify"
                     element={<InsuranceVerifierPage />}
