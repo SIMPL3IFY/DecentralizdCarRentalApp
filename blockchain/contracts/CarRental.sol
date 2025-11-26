@@ -4,17 +4,17 @@ pragma solidity ^0.8.0;
 contract CarRental {
     /* =========================== Roles & Config =========================== */
 
-    address public owner;                 // contract owner (platform)
+    address public contractOwner;         // contract owner (platform admin)
     address public insuranceVerifier;     // role
     address public arbitrator;            // role
     uint16  public platformFeeBps;        // optional marketplace fee on rental (not deposit), e.g., 200 = 2%
 
-    modifier onlyOwner() { require(msg.sender == owner, "not platform"); _; }
+    modifier onlyOwner() { require(msg.sender == contractOwner, "not contract owner"); _; }
     modifier onlyInsurance() { require(msg.sender == insuranceVerifier, "not insurance"); _; }
     modifier onlyArbitrator() { require(msg.sender == arbitrator, "not arbitrator"); _; }
 
     constructor(address _insuranceVerifier, address _arbitrator, uint16 _feeBps) {
-        owner = msg.sender;
+        contractOwner = msg.sender;
         insuranceVerifier = _insuranceVerifier;
         arbitrator = _arbitrator;
         platformFeeBps = _feeBps; // can be 0
@@ -47,12 +47,18 @@ contract CarRental {
 
     /* =============================== Listings ============================= */
 
+    enum InsuranceStatus {
+        Pending,    // 0 - never verified
+        Approved,   // 1 - verified and valid
+        Rejected    // 2 - explicitly rejected
+    }
+
     struct Listing {
-        address payable ownerAddr;
+        address payable carOwner;         // car owner (listing creator)
         uint256 dailyPrice;        // in wei per day
         uint256 securityDeposit;   // in wei
-        bool    active;            // owner can pause/unpause
-        bool    insuranceValid;    // set by InsuranceVerifier
+        bool    active;            // car owner can pause/unpause
+        InsuranceStatus insuranceStatus;  // Changed from bool insuranceValid
         string  insuranceDocURI;   // optional
         string  make;              // car make/brand
         string  model;             // car model
@@ -61,7 +67,7 @@ contract CarRental {
     }
     Listing[] public listings;
 
-    event ListingCreated(uint256 indexed listingId, address indexed owner);
+    event ListingCreated(uint256 indexed listingId, address indexed carOwner);
     event ListingEdited(uint256 indexed listingId);
     event ListingActive(uint256 indexed listingId, bool active);
     event InsuranceVerified(uint256 indexed listingId, bool valid);
@@ -81,11 +87,11 @@ contract CarRental {
         require(dailyPrice > 0, "bad price");
         require(year > 1900 && year <= 2100, "invalid year");
         listings.push(Listing({
-            ownerAddr: payable(msg.sender),
+            carOwner: payable(msg.sender),
             dailyPrice: dailyPrice,
             securityDeposit: securityDeposit,
             active: true,
-            insuranceValid: false,
+            insuranceStatus: InsuranceStatus.Pending,  // Changed
             insuranceDocURI: insuranceDocURI,
             make: make,
             model: model,
@@ -107,7 +113,7 @@ contract CarRental {
         string calldata location
     ) external {
         Listing storage L = listings[listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         require(dailyPrice > 0, "bad price");
         require(year > 1900 && year <= 2100, "invalid year");
         L.dailyPrice = dailyPrice;
@@ -122,13 +128,15 @@ contract CarRental {
 
     function setListingActive(uint256 listingId, bool active_) external {
         Listing storage L = listings[listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         L.active = active_;
         emit ListingActive(listingId, active_);
     }
 
     function verifyInsurance(uint256 listingId, bool valid) external onlyInsurance {
-        listings[listingId].insuranceValid = valid;
+        listings[listingId].insuranceStatus = valid 
+            ? InsuranceStatus.Approved 
+            : InsuranceStatus.Rejected;
         emit InsuranceVerified(listingId, valid);
     }
 
@@ -136,12 +144,11 @@ contract CarRental {
 
     enum BookingStatus {
         None,
-        Requested,     // renter escrowed funds; waiting for owner approve/reject
+        Requested,     // renter escrowed funds; waiting for car owner approve/reject
         Approved,      // pickup pending
-        Active,        // pickup confirmed by both
-        ReturnPending, // one party has confirmed return
+        Active,        // pickup confirmed by renter
         Completed,     // funds split; ratings enabled
-        Rejected,      // rejected by owner; refunded
+        Rejected,      // rejected by car owner; refunded
         Cancelled,     // cancelled before activation; refunded
         Disputed       // arbitrator must resolve
     }
@@ -157,15 +164,11 @@ contract CarRental {
 
         // status
         BookingStatus status;
-        bool renterPickup;
-        bool ownerPickup;
-        bool renterReturn;
-        bool ownerReturn;
+        bool renterPickup;  // set when renter confirms pickup
+        bool ownerReturn;   // set when owner confirms return
 
         // evidence URIs (optional)
         string pickupProofURI_renter;
-        string pickupProofURI_owner;
-        string returnProofURI_renter;
         string returnProofURI_owner;
 
         // accounting
@@ -200,6 +203,54 @@ contract CarRental {
         return (uint256(b) - uint256(a)) / 1 days;
     }
 
+    /**
+     * Check if two date ranges overlap
+     * Returns true if the ranges overlap, false otherwise
+     */
+    function datesOverlap(
+        uint64 start1,
+        uint64 end1,
+        uint64 start2,
+        uint64 end2
+    ) internal pure returns (bool) {
+        return start1 < end2 && end1 > start2;
+    }
+
+    /**
+     * Check if a booking overlaps with any active bookings for the same listing
+     * Active bookings are: Approved, Active, or Disputed
+     */
+    function hasOverlappingBooking(
+        uint256 listingId,
+        uint64 startDate,
+        uint64 endDate,
+        uint256 excludeBookingId
+    ) internal view returns (bool) {
+        for (uint256 i = 0; i < bookings.length; i++) {
+            Booking storage existing = bookings[i];
+            
+            // Skip if not for the same listing
+            if (existing.listingId != listingId) continue;
+            
+            // Skip the booking we're checking (for updates)
+            if (i == excludeBookingId) continue;
+            
+            // Only check active bookings: Approved, Active, or Disputed
+            BookingStatus status = existing.status;
+            bool isActive = status == BookingStatus.Approved ||
+                           status == BookingStatus.Active ||
+                           status == BookingStatus.Disputed;
+            
+            if (!isActive) continue;
+            
+            // Check for date overlap
+            if (datesOverlap(startDate, endDate, existing.startDate, existing.endDate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function requestBooking(
         uint256 listingId,
         uint64 startDate,
@@ -209,9 +260,13 @@ contract CarRental {
         require(msg.sender != insuranceVerifier, "insurance verifier cannot book cars");
         require(msg.sender != arbitrator, "arbitrator cannot book cars");
         Listing storage L = listings[listingId];
-        require(msg.sender != L.ownerAddr, "cannot book own listing");
+        require(msg.sender != L.carOwner, "cannot book own listing");
         require(L.active, "listing inactive");
-        require(L.insuranceValid, "insurance not valid");
+        require(
+            L.insuranceStatus == InsuranceStatus.Approved, 
+            "insurance not approved"
+        );
+        require(startDate >= block.timestamp, "start date must be in the future");
         uint256 numDays = daysBetween(startDate, endDate);
         require(numDays > 0, "min 1 day");
 
@@ -237,8 +292,15 @@ contract CarRental {
     function approveBooking(uint256 bookingId) external {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         require(B.status == BookingStatus.Requested, "bad status");
+        
+        // Check for overlapping dates with existing active bookings
+        require(
+            !hasOverlappingBooking(B.listingId, B.startDate, B.endDate, bookingId),
+            "dates overlap with existing booking"
+        );
+        
         B.status = BookingStatus.Approved;
         emit BookingApproved(bookingId);
     }
@@ -246,7 +308,7 @@ contract CarRental {
     function rejectBooking(uint256 bookingId) external nonReentrant {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
-        require(msg.sender == L.ownerAddr, "not listing owner");
+        require(msg.sender == L.carOwner, "not car owner");
         require(B.status == BookingStatus.Requested, "bad status");
         uint256 refund = B.escrow;
         B.escrow = 0;
@@ -268,58 +330,35 @@ contract CarRental {
 
     function confirmPickup(uint256 bookingId, string calldata proofURI) external {
         Booking storage B = bookings[bookingId];
-        Listing storage L = listings[B.listingId];
         require(B.status == BookingStatus.Approved, "not approved");
-        if (msg.sender == B.renter) {
-            B.renterPickup = true;
-            B.pickupProofURI_renter = proofURI;
-        } else if (msg.sender == L.ownerAddr) {
-            B.ownerPickup = true;
-            B.pickupProofURI_owner = proofURI;
-        } else {
-            revert("not party");
-        }
+        require(msg.sender == B.renter, "only renter can confirm pickup");
+        B.renterPickup = true;
+        B.pickupProofURI_renter = proofURI;
+        B.status = BookingStatus.Active;
         emit PickupConfirmed(bookingId, msg.sender);
-        if (B.renterPickup && B.ownerPickup) {
-            B.status = BookingStatus.Active;
-        }
     }
 
     function confirmReturn(uint256 bookingId, string calldata proofURI) external nonReentrant {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
-        require(B.status == BookingStatus.Active || B.status == BookingStatus.ReturnPending, "not active");
-
-        if (msg.sender == B.renter) {
-            B.renterReturn = true;
-            B.returnProofURI_renter = proofURI;
-        } else if (msg.sender == L.ownerAddr) {
-            B.ownerReturn = true;
-            B.returnProofURI_owner = proofURI;
-        } else {
-            revert("not party");
-        }
+        require(B.status == BookingStatus.Active, "not active");
+        require(msg.sender == L.carOwner, "only owner can confirm return");
+        B.ownerReturn = true;
+        B.returnProofURI_owner = proofURI;
+        _completeWithoutDispute(bookingId);
         emit ReturnConfirmed(bookingId, msg.sender);
-
-        if (B.renterReturn && B.ownerReturn) {
-            // No dispute: settle immediately
-            _completeWithoutDispute(bookingId);
-        } else {
-            B.status = BookingStatus.ReturnPending;
-        }
     }
 
     function openDispute(uint256 bookingId) external {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
         require(
-            msg.sender == B.renter || msg.sender == L.ownerAddr,
+            msg.sender == B.renter || msg.sender == L.carOwner,
             "not party"
         );
         require(
             B.status == BookingStatus.Approved ||
-            B.status == BookingStatus.Active ||
-            B.status == BookingStatus.ReturnPending,
+            B.status == BookingStatus.Active,
             "bad status"
         );
         B.status = BookingStatus.Disputed;
@@ -339,9 +378,9 @@ contract CarRental {
         uint256 fee = (ownerPayout * platformFeeBps) / 10_000;
         uint256 ownerNet = ownerPayout - fee;
 
-        balances[L.ownerAddr] += ownerNet;
+        balances[L.carOwner] += ownerNet;
         balances[B.renter] += renterPayout;
-        balances[owner] += fee;
+        balances[contractOwner] += fee;
 
         B.escrow = 0;
         B.status = BookingStatus.Completed;
@@ -352,19 +391,16 @@ contract CarRental {
     function _completeWithoutDispute(uint256 bookingId) internal {
         Booking storage B = bookings[bookingId];
         Listing storage L = listings[B.listingId];
-        require(
-            B.status == BookingStatus.Active || B.status == BookingStatus.ReturnPending,
-            "bad status"
-        );
+        require(B.status == BookingStatus.Active, "bad status");
 
         uint256 fee = (B.rentalCost * platformFeeBps) / 10_000;
         uint256 ownerNet = B.rentalCost - fee;
         uint256 renterBack = B.deposit;
 
         require(B.escrow == B.rentalCost + B.deposit, "escrow mismatch");
-        balances[L.ownerAddr] += ownerNet;
+        balances[L.carOwner] += ownerNet;
         balances[B.renter]   += renterBack;
-        balances[owner]      += fee;
+        balances[contractOwner]      += fee;
 
         B.escrow = 0;
         B.status = BookingStatus.Completed;
@@ -390,9 +426,9 @@ contract CarRental {
 
     function rateRenter(uint256 bookingId, uint8 score) external {
         Booking storage B = bookings[bookingId];
-        address listingOwner = listings[B.listingId].ownerAddr;
+        address carOwner = listings[B.listingId].carOwner;
         require(B.status == BookingStatus.Completed, "not completed");
-        require(msg.sender == listingOwner, "only owner");
+        require(msg.sender == carOwner, "only car owner");
         require(score >= 1 && score <= 5, "1..5");
         require(!rateRenterScore[bookingId].set, "rated");
         rateRenterScore[bookingId] = Rating(score, true);

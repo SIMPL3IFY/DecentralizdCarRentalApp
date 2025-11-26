@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useListings } from "../hooks/useListings";
 import { useUser } from "../hooks/useUser";
+import {
+    InsuranceStatus,
+    getInsuranceStatusName,
+} from "../constants/insuranceStatus";
 
 export const InsuranceVerifierDashboard = ({ contract, log }) => {
     const { listings, isLoading, loadListings, verifyInsurance } =
@@ -23,8 +27,16 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
         }
     };
 
-    const unverifiedListings = listings.filter((l) => !l.insuranceValid);
-    const verifiedListings = listings.filter((l) => l.insuranceValid);
+    // Separate listings by insurance status
+    const pendingListings = listings.filter(
+        (l) => l.insuranceStatus === InsuranceStatus.Pending
+    );
+    const approvedListings = listings.filter(
+        (l) => l.insuranceStatus === InsuranceStatus.Approved
+    );
+    const rejectedListings = listings.filter(
+        (l) => l.insuranceStatus === InsuranceStatus.Rejected
+    );
 
     return (
         <div className="space-y-6">
@@ -42,8 +54,7 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
             <div>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold">
-                        Listings Pending Verification (
-                        {unverifiedListings.length})
+                        Listings Pending Verification ({pendingListings.length})
                     </h3>
                     <button
                         onClick={loadListings}
@@ -56,13 +67,13 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                     <div className="bg-gray-50 p-6 rounded-lg text-center text-gray-500">
                         Loading listings...
                     </div>
-                ) : unverifiedListings.length === 0 ? (
+                ) : pendingListings.length === 0 ? (
                     <div className="bg-gray-50 p-6 rounded-lg text-center text-gray-500">
                         No listings pending verification
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {unverifiedListings.map((listing) => (
+                        {pendingListings.map((listing) => (
                             <div
                                 key={listing.id}
                                 className="border rounded-lg p-4 bg-yellow-50 hover:bg-yellow-100 transition-colors"
@@ -135,19 +146,83 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                 )}
             </div>
 
+            {/* Rejected Listings Section */}
+            {rejectedListings.length > 0 && (
+                <div>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold">
+                            Rejected Listings ({rejectedListings.length})
+                        </h3>
+                    </div>
+                    <div className="space-y-4">
+                        {rejectedListings.map((listing) => (
+                            <div
+                                key={listing.id}
+                                className="border rounded-lg p-4 bg-red-50"
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-lg">
+                                            {listing.make && listing.model
+                                                ? `${listing.make} ${
+                                                      listing.model
+                                                  }${
+                                                      listing.year
+                                                          ? ` (${listing.year})`
+                                                          : ""
+                                                  }`
+                                                : `Listing #${listing.id}`}
+                                        </p>
+                                        {listing.location && (
+                                            <p className="text-sm text-gray-600 mb-2">
+                                                {listing.location}
+                                            </p>
+                                        )}
+                                        <p className="text-sm">
+                                            Daily Price: {listing.dailyPrice}{" "}
+                                            ETH
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Listing ID: {listing.id} | Status:{" "}
+                                            <span className="text-red-600 font-semibold">
+                                                Rejected
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2 ml-4">
+                                        <button
+                                            onClick={() =>
+                                                handleVerifyInsurance(
+                                                    listing.id,
+                                                    true
+                                                )
+                                            }
+                                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium"
+                                        >
+                                            Approve
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Approved Listings Section */}
             <div>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold">
-                        Verified Listings ({verifiedListings.length})
+                        Approved Listings ({approvedListings.length})
                     </h3>
                 </div>
-                {verifiedListings.length === 0 ? (
+                {approvedListings.length === 0 ? (
                     <div className="bg-gray-50 p-6 rounded-lg text-center text-gray-500">
-                        No verified listings yet
+                        No approved listings yet
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {verifiedListings.map((listing) => (
+                        {approvedListings.map((listing) => (
                             <div
                                 key={listing.id}
                                 className="border rounded-lg p-4 bg-green-50"
@@ -172,7 +247,7 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                                 <p className="text-xs text-gray-500 mt-2">
                                     Listing ID: {listing.id} | Status:{" "}
                                     <span className="text-green-600 font-semibold">
-                                        Verified
+                                        Approved
                                     </span>
                                 </p>
                             </div>

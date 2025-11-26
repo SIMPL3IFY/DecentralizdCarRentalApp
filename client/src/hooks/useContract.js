@@ -6,7 +6,12 @@ import { web3Service } from "../services/web3Service";
  * Hook for managing contract state and operations
  */
 export const useContract = () => {
-    const [contract, setContract] = useState(null);
+    // Initialize with contract from contractService if already loaded
+    const [contract, setContract] = useState(() => {
+        return contractService.isLoaded()
+            ? contractService.getContract()
+            : null;
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
