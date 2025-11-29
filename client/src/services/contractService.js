@@ -334,9 +334,15 @@ class ContractService {
 
     async setListingActive(listingId, active) {
         const account = web3Service.getAccount();
-        return await this.contract.methods
-            .setListingActive(listingId, active)
-            .send({ from: account, gas: GAS_LIMITS.setListingActive });
+        try {
+            const tx = await this.contract.methods
+                .setListingActive(listingId, active)
+                .send({ from: account, gas: GAS_LIMITS.setListingActive });
+            return { success: true, tx };
+        } catch (error) {
+            const errorMessage = this._extractRevertReason(error);
+            return { success: false, error: errorMessage };
+        }
     }
 
     async verifyInsurance(listingId, isValid) {

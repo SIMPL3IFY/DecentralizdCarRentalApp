@@ -48,6 +48,7 @@ export const MyListingsPage = () => {
         loadListings,
         isLoading: listingsLoading,
         editListing,
+        setListingActive,
     } = useListings(contract);
     const { isRegistered, isInsuranceVerifier, isArbitrator } =
         useUser(contract);
@@ -287,6 +288,37 @@ export const MyListingsPage = () => {
         }
     };
 
+    const handleToggleListingActive = async (listingId, currentActive) => {
+        const action = currentActive ? "deactivate" : "activate";
+        if (
+            !window.confirm(
+                `Are you sure you want to ${action} this listing? ${
+                    currentActive
+                        ? "The listing will no longer be available for bookings."
+                        : "The listing will become available for bookings."
+                }`
+            )
+        ) {
+            return;
+        }
+
+        try {
+            const result = await setListingActive(listingId, !currentActive);
+            if (result.success) {
+                showMessage(
+                    `Listing ${
+                        currentActive ? "deactivated" : "activated"
+                    } successfully!`
+                );
+                await loadListings();
+            } else {
+                showMessage(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            showMessage(`Error: ${error.message}`);
+        }
+    };
+
     const handleReturnFileChange = async (bookingId, e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -374,6 +406,12 @@ export const MyListingsPage = () => {
         (listing) =>
             listing.insuranceStatus === InsuranceStatus.Approved &&
             listing.active
+    );
+
+    const inactiveListings = listingsWithBookings.filter(
+        (listing) =>
+            listing.insuranceStatus === InsuranceStatus.Approved &&
+            !listing.active
     );
 
     const rejectedInsuranceListings = listingsWithBookings.filter(
@@ -497,14 +535,33 @@ export const MyListingsPage = () => {
                                                 Pending Verification
                                             </span>
                                         </div>
-                                        <button
-                                            onClick={() =>
-                                                handleEditClick(listing)
-                                            }
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                                        >
-                                            Edit Listing
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() =>
+                                                    handleEditClick(listing)
+                                                }
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                                            >
+                                                Edit Listing
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    handleToggleListingActive(
+                                                        listing.id,
+                                                        listing.active
+                                                    )
+                                                }
+                                                className={`${
+                                                    listing.active
+                                                        ? "bg-red-600 hover:bg-red-700"
+                                                        : "bg-green-600 hover:bg-green-700"
+                                                } text-white px-4 py-2 rounded-lg text-sm font-medium`}
+                                            >
+                                                {listing.active
+                                                    ? "Deactivate"
+                                                    : "Activate"}
+                                            </button>
+                                        </div>
                                     </div>
                                     {listing.location && (
                                         <p className="text-sm text-gray-600 mb-3">
@@ -566,14 +623,33 @@ export const MyListingsPage = () => {
                                                 Insurance Rejected
                                             </span>
                                         </div>
-                                        <button
-                                            onClick={() =>
-                                                handleEditClick(listing)
-                                            }
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-                                        >
-                                            Edit Listing
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() =>
+                                                    handleEditClick(listing)
+                                                }
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                                            >
+                                                Edit Listing
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    handleToggleListingActive(
+                                                        listing.id,
+                                                        listing.active
+                                                    )
+                                                }
+                                                className={`${
+                                                    listing.active
+                                                        ? "bg-red-600 hover:bg-red-700"
+                                                        : "bg-green-600 hover:bg-green-700"
+                                                } text-white px-4 py-2 rounded-lg text-sm font-medium`}
+                                            >
+                                                {listing.active
+                                                    ? "Deactivate"
+                                                    : "Activate"}
+                                            </button>
+                                        </div>
                                     </div>
                                     {listing.location && (
                                         <p className="text-sm text-gray-600 mb-3">
@@ -586,6 +662,88 @@ export const MyListingsPage = () => {
                                         documentation and contact the verifier
                                         for re-verification.
                                     </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                        <div>
+                                            <p className="text-sm text-gray-600">
+                                                Daily Price
+                                            </p>
+                                            <p className="font-semibold">
+                                                {listing.dailyPrice} ETH
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">
+                                                Security Deposit
+                                            </p>
+                                            <p className="font-semibold">
+                                                {listing.deposit} ETH
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-4">
+                                        Listing ID: {listing.id}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {inactiveListings.length > 0 && (
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+                            Inactive Listings
+                        </h2>
+                        <div className="space-y-4">
+                            {inactiveListings.map((listing) => (
+                                <div
+                                    key={listing.id}
+                                    className="bg-gray-50 border-2 border-gray-300 rounded-lg p-6"
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-3">
+                                            <p className="font-semibold text-lg">
+                                                {listing.make && listing.model
+                                                    ? `${listing.make} ${
+                                                          listing.model
+                                                      }${
+                                                          listing.year
+                                                              ? ` (${listing.year})`
+                                                              : ""
+                                                      }`
+                                                    : `Listing #${listing.id}`}
+                                            </p>
+                                            <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+                                                Inactive
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() =>
+                                                    handleEditClick(listing)
+                                                }
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                                            >
+                                                Edit Listing
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    handleToggleListingActive(
+                                                        listing.id,
+                                                        listing.active
+                                                    )
+                                                }
+                                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                                            >
+                                                Activate
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {listing.location && (
+                                        <p className="text-sm text-gray-600 mb-3">
+                                            {listing.location}
+                                        </p>
+                                    )}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                         <div>
                                             <p className="text-sm text-gray-600">
@@ -738,14 +896,33 @@ export const MyListingsPage = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() =>
-                                                    handleEditClick(listing)
-                                                }
-                                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium ml-4"
-                                            >
-                                                Edit Listing
-                                            </button>
+                                            <div className="flex gap-2 ml-4">
+                                                <button
+                                                    onClick={() =>
+                                                        handleEditClick(listing)
+                                                    }
+                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                                                >
+                                                    Edit Listing
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        handleToggleListingActive(
+                                                            listing.id,
+                                                            listing.active
+                                                        )
+                                                    }
+                                                    className={`${
+                                                        listing.active
+                                                            ? "bg-red-600 hover:bg-red-700"
+                                                            : "bg-green-600 hover:bg-green-700"
+                                                    } text-white px-4 py-2 rounded-lg text-sm font-medium`}
+                                                >
+                                                    {listing.active
+                                                        ? "Deactivate"
+                                                        : "Activate"}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
