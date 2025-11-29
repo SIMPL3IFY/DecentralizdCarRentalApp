@@ -2,6 +2,7 @@
   "name": "rental_car_dapp_environment",
   "build": { "dockerfile": "Dockerfile.dev" },
   "postCreateCommand": "node --version && npm --version && truffle version",
+  "forwardPorts": [8545],
   "customizations": {
     "vscode": {
       "extensions": [
