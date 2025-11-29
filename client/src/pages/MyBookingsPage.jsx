@@ -5,8 +5,7 @@ import { useBookings } from "../hooks/useBookings";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
 import { contractService } from "../services/contractService";
-import { fileService } from "../services/fileService";
-import { FileViewer } from "../components/FileViewer";
+import { IPFSViewer } from "../components/IPFSViewer";
 import {
     getStatusName,
     getStatusColor,
@@ -46,8 +45,6 @@ export const MyBookingsPage = () => {
     const [filter, setFilter] = useState("all"); // "all" | "pending"
     const [isInitializing, setIsInitializing] = useState(true);
     const [message, setMessage] = useState("");
-    const [pickupFiles, setPickupFiles] = useState({});
-    const [uploadingPickup, setUploadingPickup] = useState({});
 
     useEffect(() => {
         const initialize = async () => {
@@ -86,39 +83,17 @@ export const MyBookingsPage = () => {
         setTimeout(() => setMessage(""), 3000);
     };
 
-    // Handle pickup proof file upload
-    const handlePickupFileChange = async (bookingId, e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-        if (!fileService.validateFileType(file, allowedTypes)) {
-            alert('Please upload a PDF or image file (PDF, JPG, PNG)');
-            return;
-        }
-
-        if (!fileService.validateFileSize(file, 10)) {
-            alert('File size must be less than 10MB');
-            return;
-        }
-
-        setPickupFiles(prev => ({ ...prev, [bookingId]: file }));
-        setUploadingPickup(prev => ({ ...prev, [bookingId]: true }));
-
+    const handleConfirmPickup = async (bookingId) => {
         try {
-            const resultData = await fileService.convertFileToDataURI(file);
-            const fileURI = `hash:${resultData.hash}|type:${resultData.mimeType}|ext:${resultData.extension}`;
-            const result = await confirmPickup(bookingId, fileURI);
+            const result = await confirmPickup(bookingId, "");
             if (result.success) {
-                showMessage("Pickup confirmed with proof document");
+                showMessage("Pickup confirmed");
                 await loadBookings();
             } else {
                 showMessage(`Error: ${result.error}`);
             }
         } catch (error) {
-            showMessage(`Upload failed: ${error.message}`);
-        } finally {
-            setUploadingPickup(prev => ({ ...prev, [bookingId]: false }));
+            showMessage(`Error: ${error.message}`);
         }
     };
 
@@ -337,8 +312,8 @@ export const MyBookingsPage = () => {
                                                 <p className="text-sm font-medium text-gray-700 mb-2">
                                                     📄 Your Insurance Document:
                                                 </p>
-                                                <FileViewer
-                                                    fileURI={booking.renterInsuranceDocURI}
+                                                <IPFSViewer
+                                                    ipfsURI={booking.renterInsuranceDocURI}
                                                     title="View your insurance document"
                                                     className="text-xs"
                                                 />
@@ -379,43 +354,16 @@ export const MyBookingsPage = () => {
                                         )}
                                         {booking.status ===
                                             BookingStatus.Approved && (
-                                            <div className="space-y-2">
-                                                <label className="block text-xs text-gray-600 mb-1">
-                                                    Upload Pickup Proof:
-                                                </label>
-                                                <input
-                                                    type="file"
-                                                    id={`pickup-${booking.id}`}
-                                                    accept=".pdf,.jpg,.jpeg,.png"
-                                                    onChange={(e) => handlePickupFileChange(booking.id, e)}
-                                                    disabled={uploadingPickup[booking.id]}
-                                                    className="block w-full text-xs text-gray-500
-                                                        file:mr-2 file:py-1 file:px-2
-                                                        file:rounded file:border-0
-                                                        file:text-xs file:font-semibold
-                                                        file:bg-blue-50 file:text-blue-700
-                                                        hover:file:bg-blue-100
-                                                        disabled:opacity-50 disabled:cursor-not-allowed"
-                                                />
-                                                {uploadingPickup[booking.id] && (
-                                                    <div className="flex items-center gap-1 text-xs text-gray-600">
-                                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                                                        Uploading...
-                                                    </div>
-                                                )}
-                                                {pickupFiles[booking.id] && !uploadingPickup[booking.id] && (
-                                                    <p className="text-xs text-green-600">
-                                                        ✓ {pickupFiles[booking.id].name}
-                                                    </p>
-                                                )}
-                                                {booking.pickupProofURI_renter && (
-                                                    <FileViewer 
-                                                        fileURI={booking.pickupProofURI_renter}
-                                                        title="View pickup proof"
-                                                        className="text-xs"
-                                                    />
-                                                )}
-                                            </div>
+                                            <button
+                                                onClick={() =>
+                                                    handleConfirmPickup(
+                                                        booking.id
+                                                    )
+                                                }
+                                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                                            >
+                                                Confirm Pickup
+                                            </button>
                                         )}
                                         {canOpenDispute(booking.status) &&
                                             booking.status !==

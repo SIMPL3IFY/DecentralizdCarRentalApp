@@ -4,9 +4,8 @@ import { useContract } from "../hooks/useContract";
 import { useUser } from "../hooks/useUser";
 import { useListings } from "../hooks/useListings";
 import { CONTRACT_ADDRESS } from "../constants/config";
-import { fileService } from "../services/fileService";
 import { ipfsService } from "../services/ipfsService";
-import { FileViewer } from "../components/FileViewer";
+import { IPFSViewer } from "../components/IPFSViewer";
 
 export const ListPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
@@ -66,16 +65,22 @@ export const ListPage = () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const allowedTypes = ["application/pdf", "image/png"];
-        if (!fileService.validateFileType(file, allowedTypes)) {
+        const allowedTypes = [
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "image/jpg",
+        ];
+        if (!ipfsService.validateFileType(file, allowedTypes)) {
             setErrors((prev) => ({
                 ...prev,
-                insuranceDocURI: "Please upload a PDF or PNG file only",
+                insuranceDocURI:
+                    "Please upload a PDF or image file (PDF, JPG, PNG)",
             }));
             return;
         }
 
-        if (!fileService.validateFileSize(file, 10)) {
+        if (!ipfsService.validateFileSize(file, 10)) {
             setErrors((prev) => ({
                 ...prev,
                 insuranceDocURI: "File size must be less than 10MB",
@@ -88,16 +93,19 @@ export const ListPage = () => {
         setErrors((prev) => ({ ...prev, insuranceDocURI: "" }));
 
         try {
-            const result = await fileService.uploadFile(file, true);
-            const previewURI =
-                result.storageType === "ipfs"
-                    ? ipfsService.getGatewayURL(result.uri.split("|")[0])
-                    : result.dataURI;
+            const uploadResult = await ipfsService.uploadFile(file);
+
+            const fileExtension = uploadResult.extension || "";
+            const mimeType = uploadResult.mimeType || "";
+            const ipfsURI = uploadResult.uri;
+
+            const uriWithMetadata = `${ipfsURI}|type:${mimeType}|ext:${fileExtension}`;
 
             setFormData((prev) => ({
                 ...prev,
-                insuranceDocURI: result.uri,
+                insuranceDocURI: uriWithMetadata,
             }));
+            const previewURI = ipfsService.getGatewayURL(ipfsURI);
             if (previewURI) {
                 setInsurancePreview(previewURI);
             }
@@ -136,9 +144,10 @@ export const ListPage = () => {
         if (!formData.deposit || parseFloat(formData.deposit) < 0) {
             newErrors.deposit = "Please enter a valid deposit amount";
         }
-        if (!insuranceFile) {
+        // Require an uploaded insurance document (set via IPFS upload)
+        if (!formData.insuranceDocURI.trim()) {
             newErrors.insuranceDocURI =
-                "Please upload an insurance document (PDF or PNG file)";
+                "Please upload an insurance document file";
         }
 
         setErrors(newErrors);
@@ -470,17 +479,27 @@ export const ListPage = () => {
                                     <span className="text-red-500">*</span>
                                 </label>
                                 <p className="text-xs text-gray-500 mb-4">
-                                    Upload your insurance document as a PDF or
-                                    PNG file (max 10MB).
+                                    Upload your insurance documentation file. It
+                                    will be stored securely on IPFS.
                                 </p>
 
                                 <div className="mb-4">
+                                    <label
+                                        htmlFor="insuranceFile"
+                                        className="block text-sm font-medium text-gray-700 mb-2"
+                                    >
+                                        Upload File
+                                    </label>
                                     <input
                                         type="file"
                                         id="insuranceFile"
-                                        accept=".pdf,.png"
+                                        accept=".pdf,.jpg,.jpeg,.png"
                                         onChange={handleInsuranceFileChange}
-                                        disabled={uploadingInsurance}
+                                        disabled={
+                                            uploadingInsurance ||
+                                            (formData.insuranceDocURI.trim() &&
+                                                !insuranceFile)
+                                        }
                                         className="block w-full text-sm text-gray-500
                                             file:mr-4 file:py-2 file:px-4
                                             file:rounded-lg file:border-0
@@ -523,8 +542,8 @@ export const ListPage = () => {
 
                                 {insurancePreview &&
                                     formData.insuranceDocURI && (
-                                        <FileViewer
-                                            fileURI={formData.insuranceDocURI}
+                                        <IPFSViewer
+                                            ipfsURI={formData.insuranceDocURI}
                                             title="View uploaded insurance document"
                                         />
                                     )}
@@ -536,8 +555,8 @@ export const ListPage = () => {
                                 )}
 
                                 <p className="mt-2 text-xs text-gray-500">
-                                    Only PDF and PNG files are accepted for
-                                    insurance verification.
+                                    Upload a PDF or image file (max 10MB). The
+                                    file will be stored on IPFS.
                                 </p>
                             </div>
                         </div>

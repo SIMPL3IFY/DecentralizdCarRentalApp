@@ -1,6 +1,6 @@
 export const RPC_URL = "http://127.0.0.1:8545";
 export const CONTRACT_ABI_PATH = "/CarRental.json";
-export const CONTRACT_ADDRESS = "";//Add the contract address here after truffle migrate
+export const CONTRACT_ADDRESS = "0xB805E656846EE8F5c927B58F7D88BAFD287d8677";
 export const GAS_LIMITS = {
     register: 100000,
     createListing: 500000,

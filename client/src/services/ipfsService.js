@@ -20,11 +20,16 @@ class IPFSService {
             });
             this.isConfigured = true;
         } else {
+            // Fallback to local IPFS if Infura credentials are not set
             console.warn(
-                "IPFS credentials not configured. Set VITE_INFURA_IPFS_PROJECT_ID and VITE_INFURA_IPFS_PROJECT_SECRET in .env.local to enable IPFS uploads."
+                "IPFS credentials not configured. Using local IPFS node. Set VITE_INFURA_IPFS_PROJECT_ID and VITE_INFURA_IPFS_PROJECT_SECRET in .env.local to enable Infura IPFS uploads."
             );
-            this.client = null;
-            this.isConfigured = false;
+            this.client = create({
+                host: "127.0.0.1",
+                port: 5001,
+                protocol: "http",
+            });
+            this.isConfigured = true;
         }
     }
 
@@ -56,6 +61,7 @@ class IPFSService {
                 wrapWithDirectory: false,
             });
 
+            console.log("result", result.cid.toString());
             const ipfsHash = result.cid.toString();
             const ipfsURI = `ipfs://${ipfsHash}`;
 
@@ -105,7 +111,9 @@ class IPFSService {
         }
 
         const hash = actualURI.replace("ipfs://", "");
-        return `https://ipfs.io/ipfs/${hash}`;
+
+        
+        return `http://127.0.0.1:8080/ipfs/${hash}`;
     }
 
     getFileExtension(ipfsURI) {
