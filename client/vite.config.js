@@ -5,4 +5,8 @@ import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig({
     plugins: [react(), tailwindcss()],
+    server: {
+        host: true, // This works better in WSL2 and Docker environments
+        port: 5173,
+    },
 });
