@@ -312,18 +312,24 @@ class ContractService {
         const dailyPrice = web3Service.toWei(dailyPriceEth, "ether");
         const deposit = web3Service.toWei(depositEth, "ether");
 
-        return await this.contract.methods
-            .editListing(
-                listingId,
-                dailyPrice,
-                deposit,
-                insuranceDocURI,
-                make,
-                model,
-                year,
-                location
-            )
-            .send({ from: account, gas: GAS_LIMITS.editListing });
+        try {
+            const tx = await this.contract.methods
+                .editListing(
+                    listingId,
+                    dailyPrice,
+                    deposit,
+                    insuranceDocURI,
+                    make,
+                    model,
+                    year,
+                    location
+                )
+                .send({ from: account, gas: GAS_LIMITS.editListing });
+            return { success: true, tx };
+        } catch (error) {
+            const errorMessage = this._extractRevertReason(error);
+            return { success: false, error: errorMessage };
+        }
     }
 
     async setListingActive(listingId, active) {
