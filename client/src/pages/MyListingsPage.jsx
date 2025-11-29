@@ -55,8 +55,6 @@ export const MyListingsPage = () => {
     const [filter, setFilter] = useState("all"); // "all" | "pending"
     const [isInitializing, setIsInitializing] = useState(true);
     const [message, setMessage] = useState("");
-    const [returnFiles, setReturnFiles] = useState({});
-    const [uploadingReturn, setUploadingReturn] = useState({});
     const [editingListing, setEditingListing] = useState(null);
     const [editFormData, setEditFormData] = useState({
         make: "",
@@ -319,47 +317,17 @@ export const MyListingsPage = () => {
         }
     };
 
-    const handleReturnFileChange = async (bookingId, e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        // Validate file type
-        const allowedTypes = [
-            "application/pdf",
-            "image/jpeg",
-            "image/png",
-            "image/jpg",
-        ];
-        if (!ipfsService.validateFileType(file, allowedTypes)) {
-            alert("Please upload a PDF or image file (PDF, JPG, PNG)");
-            return;
-        }
-
-        // Validate file size (max 10MB)
-        if (!ipfsService.validateFileSize(file, 10)) {
-            alert("File size must be less than 10MB");
-            return;
-        }
-
-        setReturnFiles((prev) => ({ ...prev, [bookingId]: file }));
-        setUploadingReturn((prev) => ({ ...prev, [bookingId]: true }));
-
+    const handleConfirmReturn = async (bookingId) => {
         try {
-            // Upload to IPFS
-            const ipfsURI = await ipfsService.uploadFile(file);
-
-            // Confirm return with IPFS URI
-            const result = await confirmReturn(bookingId, ipfsURI);
+            const result = await confirmReturn(bookingId, "");
             if (result.success) {
-                showMessage("Return confirmed with proof document");
+                showMessage("Return confirmed");
                 await loadBookings();
             } else {
                 showMessage(`Error: ${result.error}`);
             }
         } catch (error) {
-            showMessage(`Upload failed: ${error.message}`);
-        } finally {
-            setUploadingReturn((prev) => ({ ...prev, [bookingId]: false }));
+            showMessage(`Error: ${error.message}`);
         }
     };
 
@@ -1059,76 +1027,17 @@ export const MyListingsPage = () => {
                                                             )}
                                                             {booking.status ===
                                                                 BookingStatus.Active && (
-                                                                <div className="space-y-2">
-                                                                    <label className="block text-xs text-gray-600 mb-1">
-                                                                        Upload
-                                                                        Return
-                                                                        Proof:
-                                                                    </label>
-                                                                    <input
-                                                                        type="file"
-                                                                        id={`return-${booking.id}`}
-                                                                        accept=".pdf,.jpg,.jpeg,.png"
-                                                                        onChange={(
-                                                                            e
-                                                                        ) =>
-                                                                            handleReturnFileChange(
-                                                                                booking.id,
-                                                                                e
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            uploadingReturn[
-                                                                                booking
-                                                                                    .id
-                                                                            ]
-                                                                        }
-                                                                        className="block w-full text-xs text-gray-500
-                                                                            file:mr-2 file:py-1 file:px-2
-                                                                            file:rounded file:border-0
-                                                                            file:text-xs file:font-semibold
-                                                                            file:bg-blue-50 file:text-blue-700
-                                                                            hover:file:bg-blue-100
-                                                                            disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                    />
-                                                                    {uploadingReturn[
-                                                                        booking
-                                                                            .id
-                                                                    ] && (
-                                                                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                                                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
-                                                                            Uploading...
-                                                                        </div>
-                                                                    )}
-                                                                    {returnFiles[
-                                                                        booking
-                                                                            .id
-                                                                    ] &&
-                                                                        !uploadingReturn[
-                                                                            booking
-                                                                                .id
-                                                                        ] && (
-                                                                            <p className="text-xs text-green-600">
-                                                                                ✓{" "}
-                                                                                {
-                                                                                    returnFiles[
-                                                                                        booking
-                                                                                            .id
-                                                                                    ]
-                                                                                        .name
-                                                                                }
-                                                                            </p>
-                                                                        )}
-                                                                    {booking.returnProofURI_owner && (
-                                                                        <IPFSViewer
-                                                                            ipfsURI={
-                                                                                booking.returnProofURI_owner
-                                                                            }
-                                                                            title="View return proof"
-                                                                            className="text-xs"
-                                                                        />
-                                                                    )}
-                                                                </div>
+                                                                <button
+                                                                    onClick={() =>
+                                                                        handleConfirmReturn(
+                                                                            booking.id
+                                                                        )
+                                                                    }
+                                                                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                                                                >
+                                                                    Confirm
+                                                                    Return
+                                                                </button>
                                                             )}
                                                             {canOpenDispute(
                                                                 booking.status
