@@ -2,14 +2,43 @@ import { create } from "ipfs-http-client";
 
 class IPFSService {
     constructor() {
-        this.client = create({
-            host: "ipfs.infura.io",
-            port: 5001,
-            protocol: "https",
-        });
+        const projectId =
+            import.meta.env.VITE_INFURA_IPFS_PROJECT_ID || "";
+        const projectSecret =
+            import.meta.env.VITE_INFURA_IPFS_PROJECT_SECRET || "";
+
+        if (projectId && projectSecret) {
+            const auth = `Basic ${btoa(`${projectId}:${projectSecret}`)}`;
+
+            this.client = create({
+                host: "ipfs.infura.io",
+                port: 5001,
+                protocol: "https",
+                headers: {
+                    authorization: auth,
+                },
+            });
+            this.isConfigured = true;
+        } else {
+            console.warn(
+                "IPFS credentials not configured. Set VITE_INFURA_IPFS_PROJECT_ID and VITE_INFURA_IPFS_PROJECT_SECRET in .env.local to enable IPFS uploads."
+            );
+            this.client = null;
+            this.isConfigured = false;
+        }
+    }
+
+    isIPFSConfigured() {
+        return this.isConfigured && this.client;
     }
 
     async uploadFile(file) {
+        if (!this.isIPFSConfigured()) {
+            throw new Error(
+                "IPFS is not configured. Please set VITE_INFURA_IPFS_PROJECT_ID and VITE_INFURA_IPFS_PROJECT_SECRET in .env.local"
+            );
+        }
+
         try {
             const fileBuffer = await file.arrayBuffer();
 
@@ -44,6 +73,10 @@ class IPFSService {
     }
 
     async uploadFiles(files) {
+        if (!this.isIPFSConfigured()) {
+            throw new Error("IPFS is not configured");
+        }
+
         try {
             const uploadPromises = Array.from(files).map((file) =>
                 this.uploadFile(file)

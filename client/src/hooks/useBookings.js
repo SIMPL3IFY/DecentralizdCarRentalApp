@@ -22,7 +22,7 @@ export const useBookings = (contract) => {
     }, [contract]);
 
     const requestBooking = useCallback(
-        async (listingId, startDate, endDate) => {
+        async (listingId, startDate, endDate, renterInsuranceDocURI) => {
             if (!contract)
                 return { success: false, error: "Contract not loaded" };
 
@@ -32,7 +32,8 @@ export const useBookings = (contract) => {
                 const result = await contractService.requestBooking(
                     listingId,
                     startDate,
-                    endDate
+                    endDate,
+                    renterInsuranceDocURI
                 );
                 if (result.success) {
                     await loadBookings();

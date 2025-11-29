@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useListings } from "../hooks/useListings";
 import { useUser } from "../hooks/useUser";
-import { IPFSViewer } from "./IPFSViewer";
+import { FileViewer } from "./FileViewer";
 import {
     InsuranceStatus,
     getInsuranceStatusName,
@@ -79,7 +79,7 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                                 key={listing.id}
                                 className="border rounded-lg p-4 bg-yellow-50 hover:bg-yellow-100 transition-colors"
                             >
-                                <div className="flex justify-between items-start">
+                                <div className="flex justify-between items-start mb-4">
                                     <div className="flex-1">
                                         <p className="font-semibold text-lg">
                                             {listing.make && listing.model
@@ -109,20 +109,6 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                                             Listing ID: {listing.id} | Owner:{" "}
                                             {listing.owner.slice(0, 10)}...
                                         </p>
-                                        {listing.insuranceDocURI && (
-                                            <div className="mt-1">
-                                                <p className="text-xs text-gray-600 mb-1">
-                                                    Insurance Document:
-                                                </p>
-                                                <IPFSViewer
-                                                    ipfsURI={
-                                                        listing.insuranceDocURI
-                                                    }
-                                                    title="View insurance document"
-                                                    className="text-xs"
-                                                />
-                                            </div>
-                                        )}
                                     </div>
                                     <div className="flex gap-2 ml-4">
                                         <button
@@ -149,6 +135,22 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                                         </button>
                                     </div>
                                 </div>
+                                {listing.insuranceDocURI && (
+                                    <div className="mt-4 pt-4 border-t border-yellow-200">
+                                        <p className="text-sm font-semibold text-gray-800 mb-3">
+                                            📄 Insurance Document:
+                                        </p>
+                                        <div className="bg-white border rounded-lg p-4">
+                                            <FileViewer
+                                                fileURI={
+                                                    listing.insuranceDocURI
+                                                }
+                                                title="View insurance document"
+                                                className=""
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>

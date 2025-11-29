@@ -5,8 +5,8 @@ import { useBookings } from "../hooks/useBookings";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
 import { contractService } from "../services/contractService";
-import { ipfsService } from "../services/ipfsService";
-import { IPFSViewer } from "../components/IPFSViewer";
+import { fileService } from "../services/fileService";
+import { FileViewer } from "../components/FileViewer";
 import {
     getStatusName,
     getStatusColor,
@@ -49,7 +49,6 @@ export const MyBookingsPage = () => {
     const [pickupFiles, setPickupFiles] = useState({});
     const [uploadingPickup, setUploadingPickup] = useState({});
 
-    // Initialize contract if needed
     useEffect(() => {
         const initialize = async () => {
             if (!isLoaded) {
@@ -64,14 +63,12 @@ export const MyBookingsPage = () => {
         initialize();
     }, [isLoaded, loadContract]);
 
-    // Load bookings when contract is available
     useEffect(() => {
         if (contract && !isInitializing && isRegistered) {
             loadBookings();
         }
     }, [contract, loadBookings, isInitializing, isRegistered]);
 
-    // Listen for account changes and reload bookings
     useEffect(() => {
         if (!web3Service.isInitialized()) return;
 
@@ -89,19 +86,18 @@ export const MyBookingsPage = () => {
         setTimeout(() => setMessage(""), 3000);
     };
 
+    // Handle pickup proof file upload
     const handlePickupFileChange = async (bookingId, e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-        if (!ipfsService.validateFileType(file, allowedTypes)) {
+        if (!fileService.validateFileType(file, allowedTypes)) {
             alert('Please upload a PDF or image file (PDF, JPG, PNG)');
             return;
         }
 
-        // Validate file size (max 10MB)
-        if (!ipfsService.validateFileSize(file, 10)) {
+        if (!fileService.validateFileSize(file, 10)) {
             alert('File size must be less than 10MB');
             return;
         }
@@ -110,11 +106,9 @@ export const MyBookingsPage = () => {
         setUploadingPickup(prev => ({ ...prev, [bookingId]: true }));
 
         try {
-            // Upload to IPFS
-            const ipfsURI = await ipfsService.uploadFile(file);
-            
-            // Confirm pickup with IPFS URI
-            const result = await confirmPickup(bookingId, ipfsURI);
+            const resultData = await fileService.convertFileToDataURI(file);
+            const fileURI = `hash:${resultData.hash}|type:${resultData.mimeType}|ext:${resultData.extension}`;
+            const result = await confirmPickup(bookingId, fileURI);
             if (result.success) {
                 showMessage("Pickup confirmed with proof document");
                 await loadBookings();
@@ -130,13 +124,11 @@ export const MyBookingsPage = () => {
 
     const currentAccount = web3Service.getAccount()?.toLowerCase();
 
-    // Filter bookings for renter
     const renterBookings = bookings.filter((b) => {
         if (!currentAccount) return false;
         return b.isRenter && b.renter?.toLowerCase() === currentAccount;
     });
 
-    // Apply filter
     const filteredBookings =
         filter === "pending"
             ? renterBookings.filter(isRenterPending)
@@ -340,6 +332,18 @@ export const MyBookingsPage = () => {
                                                 </p>
                                             </div>
                                         </div>
+                                        {booking.renterInsuranceDocURI && (
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                <p className="text-sm font-medium text-gray-700 mb-2">
+                                                    📄 Your Insurance Document:
+                                                </p>
+                                                <FileViewer
+                                                    fileURI={booking.renterInsuranceDocURI}
+                                                    title="View your insurance document"
+                                                    className="text-xs"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="flex flex-col gap-2 ml-6">
@@ -405,8 +409,8 @@ export const MyBookingsPage = () => {
                                                     </p>
                                                 )}
                                                 {booking.pickupProofURI_renter && (
-                                                    <IPFSViewer 
-                                                        ipfsURI={booking.pickupProofURI_renter}
+                                                    <FileViewer 
+                                                        fileURI={booking.pickupProofURI_renter}
                                                         title="View pickup proof"
                                                         className="text-xs"
                                                     />

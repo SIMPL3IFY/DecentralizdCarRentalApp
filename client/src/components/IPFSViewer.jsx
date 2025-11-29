@@ -7,10 +7,12 @@ export const IPFSViewer = ({ ipfsURI, title, className = "" }) => {
     let fileExtension = null;
     let mimeType = null;
 
-    if (typeof ipfsURI === 'string' && ipfsURI.includes('|type:')) {
+    // Parse URI with metadata format: ipfs://hash|type:mimeType|ext:extension
+    if (typeof ipfsURI === 'string' && ipfsURI.includes('|')) {
         const parts = ipfsURI.split('|');
-        actualURI = parts[0];
+        actualURI = parts[0]; // First part is always the IPFS URI
         
+        // Extract metadata from remaining parts
         for (const part of parts) {
             if (part.startsWith('type:')) {
                 mimeType = part.replace('type:', '');
@@ -21,6 +23,14 @@ export const IPFSViewer = ({ ipfsURI, title, className = "" }) => {
     }
 
     const gatewayURL = ipfsService.getGatewayURL(actualURI);
+    
+    if (!gatewayURL) {
+        return (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                Error: Unable to generate gateway URL for the document.
+            </div>
+        );
+    }
     
     const hasImageExtension = fileExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(fileExtension);
     const hasPDFExtension = fileExtension === 'pdf';
@@ -66,9 +76,14 @@ export const IPFSViewer = ({ ipfsURI, title, className = "" }) => {
                             const errorMsg = e.target.parentElement.querySelector('.error-msg');
                             if (errorMsg) errorMsg.style.display = 'block';
                         }}
+                        onLoad={() => {
+                            // Hide error message if image loads successfully
+                            const errorMsg = document.querySelector('.error-msg');
+                            if (errorMsg) errorMsg.style.display = 'none';
+                        }}
                     />
                     <p className="text-xs text-gray-500 mt-2 error-msg hidden">
-                        Image failed to load. Click the link above to view.
+                        Image failed to load. Click the link above to view. URL: {gatewayURL}
                     </p>
                 </div>
             ) : (

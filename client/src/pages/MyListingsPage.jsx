@@ -6,8 +6,8 @@ import { useListings } from "../hooks/useListings";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
 import { contractService } from "../services/contractService";
-import { ipfsService } from "../services/ipfsService";
-import { IPFSViewer } from "../components/IPFSViewer";
+import { fileService } from "../services/fileService";
+import { FileViewer } from "../components/FileViewer";
 import { InsuranceStatus } from "../constants/insuranceStatus";
 import {
     getStatusName,
@@ -56,7 +56,6 @@ export const MyListingsPage = () => {
     const [returnFiles, setReturnFiles] = useState({});
     const [uploadingReturn, setUploadingReturn] = useState({});
 
-    // Initialize contract if needed
     useEffect(() => {
         const initialize = async () => {
             if (!isLoaded) {
@@ -71,7 +70,6 @@ export const MyListingsPage = () => {
         initialize();
     }, [isLoaded, loadContract]);
 
-    // Load bookings and listings when contract is available
     useEffect(() => {
         if (contract && !isInitializing && isRegistered) {
             loadBookings();
@@ -79,7 +77,6 @@ export const MyListingsPage = () => {
         }
     }, [contract, loadBookings, loadListings, isInitializing, isRegistered]);
 
-    // Listen for account changes and reload bookings
     useEffect(() => {
         if (!web3Service.isInitialized()) return;
 
@@ -98,19 +95,18 @@ export const MyListingsPage = () => {
         setTimeout(() => setMessage(""), 3000);
     };
 
+    // Handle return proof file upload
     const handleReturnFileChange = async (bookingId, e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // Validate file type
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-        if (!ipfsService.validateFileType(file, allowedTypes)) {
+        if (!fileService.validateFileType(file, allowedTypes)) {
             alert('Please upload a PDF or image file (PDF, JPG, PNG)');
             return;
         }
 
-        // Validate file size (max 10MB)
-        if (!ipfsService.validateFileSize(file, 10)) {
+        if (!fileService.validateFileSize(file, 10)) {
             alert('File size must be less than 10MB');
             return;
         }
@@ -119,11 +115,9 @@ export const MyListingsPage = () => {
         setUploadingReturn(prev => ({ ...prev, [bookingId]: true }));
 
         try {
-            // Upload to IPFS
-            const ipfsURI = await ipfsService.uploadFile(file);
-            
-            // Confirm return with IPFS URI
-            const result = await confirmReturn(bookingId, ipfsURI);
+            const resultData = await fileService.convertFileToDataURI(file);
+            const fileURI = `hash:${resultData.hash}|type:${resultData.mimeType}|ext:${resultData.extension}`;
+            const result = await confirmReturn(bookingId, fileURI);
             if (result.success) {
                 showMessage("Return confirmed with proof document");
                 await loadBookings();
@@ -137,13 +131,8 @@ export const MyListingsPage = () => {
         }
     };
 
-    // Get current account
     const currentAccount = web3Service.getAccount()?.toLowerCase();
-
-    // Filter bookings for owner
     const ownerBookings = bookings.filter((b) => b.isOwner);
-
-    // Get all owner's listings
     const ownerListings = listings.filter(
         (listing) => listing.owner?.toLowerCase() === currentAccount
     );
@@ -158,7 +147,6 @@ export const MyListingsPage = () => {
         bookingsByListing[listingId].push(booking);
     });
 
-    // Enrich listings with their bookings and status
     const listingsWithBookings = ownerListings.map((listing) => {
         const listingBookings = bookingsByListing[listing.id] || [];
         const hasPendingBookings = listingBookings.some(isOwnerPending);
@@ -186,7 +174,6 @@ export const MyListingsPage = () => {
         (listing) => listing.insuranceStatus === InsuranceStatus.Rejected
     );
 
-    // Apply filter to listings
     const filteredListings =
         filter === "pending"
             ? verifiedListings.filter((listing) => listing.hasPendingBookings)
@@ -540,7 +527,7 @@ export const MyListingsPage = () => {
                                                 >
                                                     <div className="flex justify-between items-start">
                                                         <div className="flex-1">
-                                                            <div className="flex items-center gap-3 mb-2">
+                                                            <div className="flex items-center gap-3 mb-3">
                                                                 <p className="font-semibold">
                                                                     Booking #
                                                                     {booking.id}
@@ -555,6 +542,43 @@ export const MyListingsPage = () => {
                                                                     )}
                                                                 </span>
                                                             </div>
+
+                                                            {/* RENTER INSURANCE - PROMINENT SECTION */}
+                                                            {booking.renterInsuranceDocURI ? (
+                                                                <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                                                                    <div className="flex items-center gap-2 mb-3">
+                                                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                                        </svg>
+                                                                        <p className="text-sm font-semibold text-blue-900">
+                                                                            Renter Insurance Document
+                                                                        </p>
+                                                                        <span className="ml-auto px-2 py-1 bg-blue-200 text-blue-800 text-xs font-medium rounded">
+                                                                            Required
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="bg-white rounded border border-blue-100 p-3">
+                                                                        <FileViewer
+                                                                            fileURI={booking.renterInsuranceDocURI}
+                                                                            title="View renter insurance document"
+                                                                            className="text-xs"
+                                                                        />
+                                                                    </div>
+                                                                    <p className="text-xs text-blue-700 mt-2">
+                                                                        💡 Review the renter's insurance document before approving the booking
+                                                                    </p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                                    <p className="text-sm text-yellow-800 flex items-center gap-2">
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                                        </svg>
+                                                                        ⚠️ Renter insurance document not provided
+                                                                    </p>
+                                                                </div>
+                                                            )}
+
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 mb-3">
                                                                 <div>
                                                                     <p className="text-sm text-gray-600">
@@ -568,17 +592,17 @@ export const MyListingsPage = () => {
                                                                             : "N/A"}
                                                                     </p>
                                                                 </div>
-                                                                <div>
-                                                                    <p className="text-sm text-gray-600">
-                                                                        Renter
-                                                                    </p>
-                                                                    <p className="font-mono text-sm">
-                                                                        {
-                                                                            booking.renter
-                                                                        }
-                                                                    </p>
+                                                                    <div>
+                                                                        <p className="text-sm text-gray-600">
+                                                                            Renter
+                                                                        </p>
+                                                                        <p className="font-mono text-sm">
+                                                                            {
+                                                                                booking.renter
+                                                                            }
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                                                 <div>
                                                                     <p className="text-sm text-gray-600">
@@ -690,8 +714,8 @@ export const MyListingsPage = () => {
                                                                         </p>
                                                                     )}
                                                                     {booking.returnProofURI_owner && (
-                                                                        <IPFSViewer 
-                                                                            ipfsURI={booking.returnProofURI_owner}
+                                                                        <FileViewer 
+                                                                            fileURI={booking.returnProofURI_owner}
                                                                             title="View return proof"
                                                                             className="text-xs"
                                                                         />

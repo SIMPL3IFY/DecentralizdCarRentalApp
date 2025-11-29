@@ -168,6 +168,7 @@ contract CarRental {
         bool ownerReturn;   // set when owner confirms return
 
         // evidence URIs (optional)
+        string renterInsuranceDocURI;  // renter's insurance document (required for booking)
         string pickupProofURI_renter;
         string returnProofURI_owner;
 
@@ -254,7 +255,8 @@ contract CarRental {
     function requestBooking(
         uint256 listingId,
         uint64 startDate,
-        uint64 endDate
+        uint64 endDate,
+        string calldata renterInsuranceDocURI
     ) external payable returns (uint256 id) {
         require(users[msg.sender].registered, "register first");
         require(msg.sender != insuranceVerifier, "insurance verifier cannot book cars");
@@ -273,6 +275,7 @@ contract CarRental {
         uint256 rentalCost = L.dailyPrice * numDays;
         uint256 total = rentalCost + L.securityDeposit;
         require(msg.value == total, "incorrect escrow");
+        require(bytes(renterInsuranceDocURI).length > 0, "renter insurance required");
 
         bookings.push();
         id = bookings.length - 1;
@@ -285,6 +288,7 @@ contract CarRental {
         B.deposit = L.securityDeposit;
         B.status = BookingStatus.Requested;
         B.escrow = total;
+        B.renterInsuranceDocURI = renterInsuranceDocURI;
 
         emit BookingRequested(id, listingId, msg.sender, total);
     }

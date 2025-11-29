@@ -123,6 +123,7 @@ class ContractService {
             escrow: web3Service.fromWei(booking.escrow, "ether"),
             renterPickup: booking.renterPickup || false,
             ownerReturn: booking.ownerReturn || false,
+            renterInsuranceDocURI: booking.renterInsuranceDocURI || "",
         };
 
         if (listing) {
@@ -378,7 +379,7 @@ class ContractService {
         };
     }
 
-    async requestBooking(listingId, startDate, endDate) {
+    async requestBooking(listingId, startDate, endDate, renterInsuranceDocURI) {
         const account = web3Service.getAccount();
         const web3 = web3Service.getWeb3();
 
@@ -416,16 +417,54 @@ class ContractService {
 
         const { escrow } = this.calculateEscrow(listing, startDate, endDate);
 
-        const tx = await this.contract.methods
-            .requestBooking(listingId, startTimestamp, endTimestamp)
-            .send({
-                from: account,
-                value: escrow,
-                gas: GAS_LIMITS.requestBooking,
-            });
+        if (!renterInsuranceDocURI?.trim()) {
+            throw new Error("Renter insurance document URI is required");
+        }
 
-        const bookingId = tx.events.BookingRequested.returnValues.bookingId;
-        return { success: true, bookingId: Number(bookingId), tx };
+        try {
+            const tx = await this.contract.methods
+                .requestBooking(listingId, startTimestamp, endTimestamp, renterInsuranceDocURI)
+                .send({
+                    from: account,
+                    value: escrow,
+                    gas: GAS_LIMITS.requestBooking,
+                });
+
+            const bookingId = tx.events.BookingRequested.returnValues.bookingId;
+            return { success: true, bookingId: Number(bookingId), tx };
+        } catch (error) {
+            let errorMessage = error.message;
+
+            if (error.receipt?.status === 0) {
+                const revertReason = this._extractRevertReason(error);
+                const errorMap = {
+                    "register first": "Please register your account first",
+                    "insurance verifier cannot book cars": "Insurance verifiers cannot book cars",
+                    "arbitrator cannot book cars": "Arbitrators cannot book cars",
+                    "cannot book own listing": "You cannot book your own listing",
+                    "listing inactive": "This listing is currently inactive",
+                    "insurance not approved": "The listing's insurance has not been approved yet",
+                    "start date must be in the future": "The start date must be in the future",
+                    "min 1 day": "Rental period must be at least 1 day",
+                    "incorrect escrow": `Incorrect payment amount. Expected ${web3Service.fromWei(escrow, "ether")} ETH`,
+                    "renter insurance required": "Renter insurance document is required",
+                    "end>start": "End date must be after start date"
+                };
+
+                for (const [key, message] of Object.entries(errorMap)) {
+                    if (revertReason.toLowerCase().includes(key.toLowerCase())) {
+                        errorMessage = message;
+                        break;
+                    }
+                }
+
+                if (errorMessage === error.message && revertReason) {
+                    errorMessage = `Transaction failed: ${revertReason}`;
+                }
+            }
+
+            throw new Error(errorMessage);
+        }
     }
 
     async getBooking(bookingId) {

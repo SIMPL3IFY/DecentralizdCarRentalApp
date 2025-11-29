@@ -6,6 +6,9 @@ import { useUser } from "../hooks/useUser";
 import { useBookings } from "../hooks/useBookings";
 import { contractService } from "../services/contractService";
 import { web3Service } from "../services/web3Service";
+import { fileService } from "../services/fileService";
+import { ipfsService } from "../services/ipfsService";
+import { FileViewer } from "../components/FileViewer";
 import { CONTRACT_ADDRESS } from "../constants/config";
 import { InsuranceStatus } from "../constants/insuranceStatus";
 
@@ -21,12 +24,15 @@ export const RentPage = () => {
     const [bookingForm, setBookingForm] = useState({
         startDate: "",
         endDate: "",
+        renterInsuranceDocURI: "",
     });
     const [escrowAmount, setEscrowAmount] = useState(null);
     const [bookingError, setBookingError] = useState("");
     const [bookingSuccess, setBookingSuccess] = useState(false);
+    const [renterInsuranceFile, setRenterInsuranceFile] = useState(null);
+    const [uploadingInsurance, setUploadingInsurance] = useState(false);
+    const [insurancePreview, setInsurancePreview] = useState(null);
 
-    // Initialize contract if needed
     useEffect(() => {
         const initialize = async () => {
             if (!isLoaded) {
@@ -75,16 +81,15 @@ export const RentPage = () => {
         calculateEscrow();
     }, [selectedListing, bookingForm.startDate, bookingForm.endDate]);
 
-    const availableListings = listings.filter(
-        (listing) =>
+    const currentAccount = web3Service.getAccount()?.toLowerCase();
+    const availableListings = listings.filter((listing) => {
+        const isOwner = currentAccount && listing.owner?.toLowerCase() === currentAccount;
+        return (
             listing.active &&
-            listing.insuranceStatus === InsuranceStatus.Approved
-    );
-
-    const getCarImageUrl = (make, model) => {
-        const searchTerm = `${make} ${model}`.replace(/\s+/g, "+");
-        return `https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400&h=300&fit=crop&q=80`;
-    };
+            listing.insuranceStatus === InsuranceStatus.Approved &&
+            !isOwner
+        );
+    });
 
     const handleOpenBookingModal = (listing) => {
         if (!isRegistered) {
@@ -92,18 +97,63 @@ export const RentPage = () => {
             return;
         }
         setSelectedListing(listing);
-        setBookingForm({ startDate: "", endDate: "" });
+        setBookingForm({ startDate: "", endDate: "", renterInsuranceDocURI: "" });
         setEscrowAmount(null);
         setBookingError("");
         setBookingSuccess(false);
+        setRenterInsuranceFile(null);
+        setInsurancePreview(null);
     };
 
     const handleCloseBookingModal = () => {
         setSelectedListing(null);
-        setBookingForm({ startDate: "", endDate: "" });
+        setBookingForm({ startDate: "", endDate: "", renterInsuranceDocURI: "" });
         setEscrowAmount(null);
         setBookingError("");
         setBookingSuccess(false);
+        setRenterInsuranceFile(null);
+        setInsurancePreview(null);
+    };
+
+    // Handle renter insurance file upload (IPFS with localStorage fallback)
+    const handleRenterInsuranceFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const allowedTypes = ["application/pdf", "image/png"];
+        if (!fileService.validateFileType(file, allowedTypes)) {
+            setBookingError("Please upload a PDF or PNG file only");
+            return;
+        }
+
+        if (!fileService.validateFileSize(file, 10)) {
+            setBookingError("File size must be less than 10MB");
+            return;
+        }
+
+        setRenterInsuranceFile(file);
+        setUploadingInsurance(true);
+        setBookingError("");
+
+        try {
+            const result = await fileService.uploadFile(file, true);
+            const previewURI = result.storageType === "ipfs"
+                ? ipfsService.getGatewayURL(result.uri.split("|")[0])
+                : result.dataURI;
+
+            setBookingForm((prev) => ({
+                ...prev,
+                renterInsuranceDocURI: result.uri,
+            }));
+            if (previewURI) {
+                setInsurancePreview(previewURI);
+            }
+        } catch (error) {
+            setBookingError(error.message);
+            setRenterInsuranceFile(null);
+        } finally {
+            setUploadingInsurance(false);
+        }
     };
 
     const handleBookingFormChange = (e) => {
@@ -125,8 +175,19 @@ export const RentPage = () => {
             return;
         }
 
+        if (!bookingForm.renterInsuranceDocURI?.trim() || !renterInsuranceFile) {
+            setBookingError("Please upload your insurance document (PDF or PNG)");
+            return;
+        }
+
         if (!selectedListing) {
             setBookingError("No listing selected");
+            return;
+        }
+
+        const currentAccount = web3Service.getAccount()?.toLowerCase();
+        if (currentAccount && selectedListing.owner?.toLowerCase() === currentAccount) {
+            setBookingError("You cannot rent your own car listing");
             return;
         }
 
@@ -134,24 +195,24 @@ export const RentPage = () => {
             const result = await requestBooking(
                 selectedListing.id,
                 bookingForm.startDate,
-                bookingForm.endDate
+                bookingForm.endDate,
+                bookingForm.renterInsuranceDocURI
             );
 
             if (result.success) {
                 setBookingSuccess(true);
                 setTimeout(() => {
                     handleCloseBookingModal();
-                    loadListings(); // Refresh listings
+                    loadListings();
                 }, 2000);
             } else {
                 setBookingError(result.error || "Failed to request booking");
             }
         } catch (error) {
-            setBookingError(error.message || "An error occurred");
+            setBookingError(error.message || "An error occurred. Please check your wallet and try again.");
         }
     };
 
-    // Get minimum date (tomorrow)
     const getMinDate = () => {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -159,7 +220,6 @@ export const RentPage = () => {
         return tomorrow.toISOString().split("T")[0];
     };
 
-    // Get minimum end date (start date + 1 day)
     const getMinEndDate = () => {
         if (!bookingForm.startDate) return getMinDate();
         const startDate = new Date(bookingForm.startDate);
@@ -252,10 +312,7 @@ export const RentPage = () => {
                             >
                                 <div className="relative h-48 bg-gray-200 overflow-hidden">
                                     <img
-                                        src={getCarImageUrl(
-                                            listing.make,
-                                            listing.model
-                                        )}
+                                        src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400&h=300&fit=crop&q=80"
                                         alt={`${listing.make} ${listing.model}`}
                                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                         onError={(e) => {
@@ -411,6 +468,71 @@ export const RentPage = () => {
                                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                                     />
                                                 </div>
+                                            </div>
+
+                                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                                                <h3 className="font-semibold text-gray-900 mb-3">
+                                                    Renter Insurance Document{" "}
+                                                    <span className="text-red-500">*</span>
+                                                </h3>
+                                                <p className="text-xs text-gray-600 mb-4">
+                                                    Upload your insurance document as a PDF or PNG file (max 10MB). 
+                                                    This is required to rent a car.
+                                                </p>
+                                                <div className="mb-4">
+                                                    <input
+                                                        type="file"
+                                                        id="renterInsuranceFile"
+                                                        accept=".pdf,.png"
+                                                        onChange={handleRenterInsuranceFileChange}
+                                                        disabled={uploadingInsurance || bookingSuccess}
+                                                        className="block w-full text-sm text-gray-500
+                                                            file:mr-4 file:py-2 file:px-4
+                                                            file:rounded-lg file:border-0
+                                                            file:text-sm file:font-semibold
+                                                            file:bg-blue-50 file:text-blue-700
+                                                            hover:file:bg-blue-100
+                                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    />
+                                                    {uploadingInsurance && (
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                                            <p className="text-sm text-gray-600">
+                                                                Processing file...
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {renterInsuranceFile && !uploadingInsurance && (
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                            <p className="text-sm text-green-600">
+                                                                ✓ {renterInsuranceFile.name} uploaded successfully
+                                                            </p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setRenterInsuranceFile(null);
+                                                                    setInsurancePreview(null);
+                                                                    setBookingForm((prev) => ({
+                                                                        ...prev,
+                                                                        renterInsuranceDocURI: "",
+                                                                    }));
+                                                                }}
+                                                                className="text-xs text-red-600 hover:text-red-800 underline"
+                                                            >
+                                                                Clear
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {insurancePreview && bookingForm.renterInsuranceDocURI && (
+                                                    <FileViewer
+                                                        fileURI={bookingForm.renterInsuranceDocURI}
+                                                        title="View uploaded insurance document"
+                                                    />
+                                                )}
+                                                <p className="mt-2 text-xs text-gray-500">
+                                                    Only PDF and PNG files are accepted.
+                                                </p>
                                             </div>
 
                                             {escrowAmount && (
