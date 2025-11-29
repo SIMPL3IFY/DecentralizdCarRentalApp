@@ -3,7 +3,6 @@ import { create } from "ipfs-http-client";
 class IPFSService {
     constructor() {
         this.client = create({
-            // Use local IPFS daemon API instead of Infura (avoids project-id auth requirement)
             // Make sure your local IPFS node is running with the HTTP API on 127.0.0.1:5001
             host: "127.0.0.1",
             port: 5001,
@@ -76,9 +75,7 @@ class IPFSService {
 
         const hash = actualURI.replace("ipfs://", "");
 
-        // Use local IPFS HTTP gateway (what you're testing with now):
-        //   http://127.0.0.1:8080/ipfs/<CID>
-        // If you ever want to switch back to a public gateway, just change this URL.
+        
         return `http://127.0.0.1:8080/ipfs/${hash}`;
     }
 

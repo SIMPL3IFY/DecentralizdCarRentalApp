@@ -68,11 +68,6 @@ export const IPFSViewer = ({ ipfsURI, title, className = "" }) => {
                             style={{ minHeight: "400px" }}
                         />
                     </div>
-                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                        PDF document loaded. If the preview doesn't appear,
-                        click the link above to open in a new tab. Some browsers
-                        may require you to download the PDF instead.
-                    </div>
                 </div>
             ) : isImageType ? (
                 <div className="mt-2">
