@@ -124,6 +124,33 @@ export const useListings = (contract) => {
         [contract, loadListings]
     );
 
+    const setListingActive = useCallback(
+        async (listingId, active) => {
+            if (!contract)
+                return { success: false, error: "Contract not loaded" };
+
+            setIsLoading(true);
+            setError(null);
+            try {
+                const result = await contractService.setListingActive(
+                    listingId,
+                    active
+                );
+                if (result.success) {
+                    await loadListings();
+                    return result;
+                }
+                return result;
+            } catch (err) {
+                setError(err.message);
+                return { success: false, error: err.message };
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [contract, loadListings]
+    );
+
     return {
         listings,
         isLoading,
@@ -132,5 +159,6 @@ export const useListings = (contract) => {
         createListing,
         verifyInsurance,
         editListing,
+        setListingActive,
     };
 };
