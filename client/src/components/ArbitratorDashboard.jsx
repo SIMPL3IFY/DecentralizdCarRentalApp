@@ -38,7 +38,6 @@ export const ArbitratorDashboard = ({ contract, log }) => {
 
         const unsubscribe = web3Service.onAccountChange((newAccount) => {
             if (contract && newAccount) {
-                console.log("Account changed, reloading disputes...");
                 loadDisputedBookings();
             }
         });

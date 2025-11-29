@@ -41,14 +41,12 @@ export const RentPage = () => {
         initialize();
     }, [isLoaded, loadContract]);
 
-    // Load listings when contract is available
     useEffect(() => {
         if (contract && !isInitializing) {
             loadListings();
         }
     }, [contract, loadListings, isInitializing]);
 
-    // Calculate escrow when dates change
     useEffect(() => {
         const calculateEscrow = async () => {
             if (
@@ -77,16 +75,13 @@ export const RentPage = () => {
         calculateEscrow();
     }, [selectedListing, bookingForm.startDate, bookingForm.endDate]);
 
-    // Filter only active and insurance-approved listings
     const availableListings = listings.filter(
         (listing) =>
             listing.active &&
             listing.insuranceStatus === InsuranceStatus.Approved
     );
 
-    // Generate placeholder image URL based on car make/model
     const getCarImageUrl = (make, model) => {
-        // Using a placeholder service - can be replaced with actual images later
         const searchTerm = `${make} ${model}`.replace(/\s+/g, "+");
         return `https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400&h=300&fit=crop&q=80`;
     };
@@ -210,7 +205,6 @@ export const RentPage = () => {
         <div className="min-h-screen bg-gray-50">
             <Navbar />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
                         Available Cars for Rent
@@ -221,14 +215,12 @@ export const RentPage = () => {
                     </p>
                 </div>
 
-                {/* Error State */}
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-red-800">{error}</p>
                     </div>
                 )}
 
-                {/* Loading State */}
                 {isLoading && (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
@@ -238,7 +230,6 @@ export const RentPage = () => {
                     </div>
                 )}
 
-                {/* Empty State */}
                 {!isLoading && availableListings.length === 0 && (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
@@ -252,7 +243,6 @@ export const RentPage = () => {
                     </div>
                 )}
 
-                {/* Car Cards Grid */}
                 {!isLoading && availableListings.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {availableListings.map((listing) => (
@@ -260,7 +250,6 @@ export const RentPage = () => {
                                 key={listing.id}
                                 className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden group"
                             >
-                                {/* Car Image */}
                                 <div className="relative h-48 bg-gray-200 overflow-hidden">
                                     <img
                                         src={getCarImageUrl(
@@ -276,9 +265,7 @@ export const RentPage = () => {
                                     />
                                 </div>
 
-                                {/* Car Info */}
                                 <div className="p-4">
-                                    {/* Car Name */}
                                     <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-1">
                                         {listing.make} {listing.model}
                                     </h3>
@@ -286,7 +273,6 @@ export const RentPage = () => {
                                         {listing.year} • {listing.location}
                                     </p>
 
-                                    {/* Price */}
                                     <div className="flex items-baseline mt-3 pt-3 border-t border-gray-100 mb-3">
                                         <span className="text-2xl font-bold text-gray-900">
                                             {parseFloat(
@@ -298,7 +284,6 @@ export const RentPage = () => {
                                         </span>
                                     </div>
 
-                                    {/* Rent Button */}
                                     <button
                                         onClick={() =>
                                             handleOpenBookingModal(listing)
@@ -313,7 +298,6 @@ export const RentPage = () => {
                     </div>
                 )}
 
-                {/* Booking Modal */}
                 {selectedListing && (
                     <>
                         <div
@@ -326,7 +310,6 @@ export const RentPage = () => {
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="p-6">
-                                    {/* Header */}
                                     <div className="flex justify-between items-start mb-6">
                                         <div>
                                             <h2 className="text-2xl font-bold text-gray-900">
@@ -358,7 +341,6 @@ export const RentPage = () => {
                                         </button>
                                     </div>
 
-                                    {/* Success Message */}
                                     {bookingSuccess && (
                                         <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                                             <p className="text-green-800 font-medium">
@@ -368,7 +350,6 @@ export const RentPage = () => {
                                         </div>
                                     )}
 
-                                    {/* Error Message */}
                                     {bookingError && (
                                         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                                             <p className="text-red-800">
@@ -377,10 +358,8 @@ export const RentPage = () => {
                                         </div>
                                     )}
 
-                                    {/* Booking Form */}
                                     <form onSubmit={handleRequestBooking}>
                                         <div className="space-y-4">
-                                            {/* Date Selection */}
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
                                                     <label
@@ -434,7 +413,6 @@ export const RentPage = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Price Breakdown */}
                                             {escrowAmount && (
                                                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                                     <h3 className="font-semibold text-gray-900 mb-3">
@@ -515,7 +493,6 @@ export const RentPage = () => {
                                                 </div>
                                             )}
 
-                                            {/* Submit Button */}
                                             <div className="flex justify-end gap-3 pt-4">
                                                 <button
                                                     type="button"

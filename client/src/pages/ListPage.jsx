@@ -4,16 +4,13 @@ import { useContract } from "../hooks/useContract";
 import { useUser } from "../hooks/useUser";
 import { useListings } from "../hooks/useListings";
 import { CONTRACT_ADDRESS } from "../constants/config";
-import { contractService } from "../services/contractService";
+import { ipfsService } from "../services/ipfsService";
+import { IPFSViewer } from "../components/IPFSViewer";
 
 export const ListPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
-    const {
-        isRegistered,
-        isInsuranceVerifier,
-        isArbitrator,
-        checkRegistration,
-    } = useUser(contract);
+    const { isRegistered, isInsuranceVerifier, isArbitrator } =
+        useUser(contract);
     const { createListing, isLoading: isCreatingListing } =
         useListings(contract);
 
@@ -31,8 +28,10 @@ export const ListPage = () => {
     const [success, setSuccess] = useState(false);
     const [listingId, setListingId] = useState(null);
     const [isInitializing, setIsInitializing] = useState(true);
+    const [uploadingInsurance, setUploadingInsurance] = useState(false);
+    const [insuranceFile, setInsuranceFile] = useState(null);
+    const [insurancePreview, setInsurancePreview] = useState(null);
 
-    // Initialize contract if needed
     useEffect(() => {
         const initialize = async () => {
             if (!isLoaded) {
@@ -53,12 +52,66 @@ export const ListPage = () => {
             ...prev,
             [name]: value,
         }));
-        // Clear error for this field
         if (errors[name]) {
             setErrors((prev) => ({
                 ...prev,
                 [name]: "",
             }));
+        }
+    };
+
+    const handleInsuranceFileChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const allowedTypes = [
+            "application/pdf",
+            "image/jpeg",
+            "image/png",
+            "image/jpg",
+        ];
+        if (!ipfsService.validateFileType(file, allowedTypes)) {
+            setErrors((prev) => ({
+                ...prev,
+                insuranceDocURI:
+                    "Please upload a PDF or image file (PDF, JPG, PNG)",
+            }));
+            return;
+        }
+
+        if (!ipfsService.validateFileSize(file, 10)) {
+            setErrors((prev) => ({
+                ...prev,
+                insuranceDocURI: "File size must be less than 10MB",
+            }));
+            return;
+        }
+
+        setInsuranceFile(file);
+        setUploadingInsurance(true);
+        setErrors((prev) => ({ ...prev, insuranceDocURI: "" }));
+
+        try {
+            const uploadResult = await ipfsService.uploadFile(file);
+
+            const fileExtension = uploadResult.extension || "";
+            const mimeType = uploadResult.mimeType || "";
+            const ipfsURI = uploadResult.uri;
+
+            const uriWithMetadata = `${ipfsURI}|type:${mimeType}|ext:${fileExtension}`;
+
+            setFormData((prev) => ({
+                ...prev,
+                insuranceDocURI: uriWithMetadata,
+            }));
+            setInsurancePreview(ipfsService.getGatewayURL(ipfsURI));
+        } catch (error) {
+            setErrors((prev) => ({
+                ...prev,
+                insuranceDocURI: error.message,
+            }));
+        } finally {
+            setUploadingInsurance(false);
         }
     };
 
@@ -87,8 +140,10 @@ export const ListPage = () => {
         if (!formData.deposit || parseFloat(formData.deposit) < 0) {
             newErrors.deposit = "Please enter a valid deposit amount";
         }
+        // Require an uploaded insurance document (set via IPFS upload)
         if (!formData.insuranceDocURI.trim()) {
-            newErrors.insuranceDocURI = "Insurance document URI is required";
+            newErrors.insuranceDocURI =
+                "Please upload an insurance document file";
         }
 
         setErrors(newErrors);
@@ -128,7 +183,6 @@ export const ListPage = () => {
             if (result.success) {
                 setSuccess(true);
                 setListingId(result.listingId);
-                // Reset form
                 setFormData({
                     make: "",
                     model: "",
@@ -138,7 +192,8 @@ export const ListPage = () => {
                     deposit: "",
                     insuranceDocURI: "",
                 });
-                // Scroll to success message
+                setInsuranceFile(null);
+                setInsurancePreview(null);
                 window.scrollTo({ top: 0, behavior: "smooth" });
             } else {
                 alert(`Failed to create listing: ${result.error}`);
@@ -187,7 +242,6 @@ export const ListPage = () => {
             <Navbar />
 
             <div className="w-full px-18 py-12 ">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-4xl font-bold text-gray-900 mb-2">
                         List Your Car
@@ -198,17 +252,14 @@ export const ListPage = () => {
                     </p>
                 </div>
 
-                {/* Main Form Card */}
                 <div className="w-full">
                     <form onSubmit={handleSubmit} className="p-8">
-                        {/* Car Information Section */}
                         <div className="mb-10">
                             <h2 className="text-2xl font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
                                 Car Information
                             </h2>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Make */}
                                 <div>
                                     <label
                                         htmlFor="make"
@@ -237,7 +288,6 @@ export const ListPage = () => {
                                     )}
                                 </div>
 
-                                {/* Model */}
                                 <div>
                                     <label
                                         htmlFor="model"
@@ -266,7 +316,6 @@ export const ListPage = () => {
                                     )}
                                 </div>
 
-                                {/* Year */}
                                 <div>
                                     <label
                                         htmlFor="year"
@@ -297,7 +346,6 @@ export const ListPage = () => {
                                     )}
                                 </div>
 
-                                {/* Location */}
                                 <div>
                                     <label
                                         htmlFor="location"
@@ -328,14 +376,12 @@ export const ListPage = () => {
                             </div>
                         </div>
 
-                        {/* Pricing Section */}
                         <div className="mb-10">
                             <h2 className="text-2xl font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
                                 Pricing & Security
                             </h2>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Daily Price */}
                                 <div>
                                     <label
                                         htmlFor="dailyPrice"
@@ -376,7 +422,6 @@ export const ListPage = () => {
                                     </p>
                                 </div>
 
-                                {/* Security Deposit */}
                                 <div>
                                     <label
                                         htmlFor="deposit"
@@ -419,42 +464,99 @@ export const ListPage = () => {
                             </div>
                         </div>
 
-                        {/* Insurance Section */}
                         <div className="mb-10">
                             <h2 className="text-2xl font-semibold text-gray-900 mb-6 pb-3 border-b border-gray-200">
                                 Insurance Documentation
                             </h2>
 
                             <div>
-                                <label
-                                    htmlFor="insuranceDocURI"
-                                    className="block text-sm font-medium text-gray-700 mb-2"
-                                >
-                                    Insurance Document URI{" "}
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Insurance Document{" "}
                                     <span className="text-red-500">*</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    id="insuranceDocURI"
-                                    name="insuranceDocURI"
-                                    value={formData.insuranceDocURI}
-                                    onChange={handleChange}
-                                    placeholder="ipfs://insurance.pdf or https://..."
-                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                                        errors.insuranceDocURI
-                                            ? "border-red-300"
-                                            : "border-gray-300"
-                                    }`}
-                                />
+                                <p className="text-xs text-gray-500 mb-4">
+                                    Upload your insurance documentation file. It
+                                    will be stored securely on IPFS.
+                                </p>
+
+                                <div className="mb-4">
+                                    <label
+                                        htmlFor="insuranceFile"
+                                        className="block text-sm font-medium text-gray-700 mb-2"
+                                    >
+                                        Upload File
+                                    </label>
+                                    <input
+                                        type="file"
+                                        id="insuranceFile"
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        onChange={handleInsuranceFileChange}
+                                        disabled={
+                                            uploadingInsurance ||
+                                            (formData.insuranceDocURI.trim() &&
+                                                !insuranceFile)
+                                        }
+                                        className="block w-full text-sm text-gray-500
+                                            file:mr-4 file:py-2 file:px-4
+                                            file:rounded-lg file:border-0
+                                            file:text-sm file:font-semibold
+                                            file:bg-indigo-50 file:text-indigo-700
+                                            hover:file:bg-indigo-100
+                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                    />
+                                    {uploadingInsurance && (
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                                            <p className="text-sm text-gray-600">
+                                                Uploading to IPFS...
+                                            </p>
+                                        </div>
+                                    )}
+                                    {insuranceFile && !uploadingInsurance && (
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <p className="text-sm text-green-600">
+                                                ✓ {insuranceFile.name} uploaded
+                                                successfully
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setInsuranceFile(null);
+                                                    setInsurancePreview(null);
+                                                    setFormData((prev) => ({
+                                                        ...prev,
+                                                        insuranceDocURI: "",
+                                                    }));
+                                                }}
+                                                className="text-xs text-red-600 hover:text-red-800 underline"
+                                            >
+                                                Clear
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {insurancePreview &&
+                                    formData.insuranceDocURI && (
+                                        <IPFSViewer
+                                            ipfsURI={formData.insuranceDocURI}
+                                            title="View uploaded insurance document"
+                                        />
+                                    )}
+
                                 {errors.insuranceDocURI && (
                                     <p className="mt-1 text-sm text-red-600">
                                         {errors.insuranceDocURI}
                                     </p>
                                 )}
+
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Upload a PDF or image file (max 10MB). The
+                                    file will be stored on IPFS.
+                                </p>
                             </div>
                         </div>
 
-                        {/* Submit Button */}
                         <div className="flex items-center justify-between pt-6 border-t border-gray-200">
                             <div className="text-sm text-gray-600">
                                 <span className="text-red-500">*</span> Required

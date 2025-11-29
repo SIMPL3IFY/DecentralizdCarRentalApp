@@ -5,6 +5,8 @@ import { useBookings } from "../hooks/useBookings";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
 import { contractService } from "../services/contractService";
+import { ipfsService } from "../services/ipfsService";
+import { IPFSViewer } from "../components/IPFSViewer";
 import {
     getStatusName,
     getStatusColor,
@@ -14,18 +16,13 @@ import {
 } from "../constants/bookingStatus";
 import { CONTRACT_ADDRESS } from "../constants/config";
 
-/**
- * Check if a booking is pending (needs renter action)
- */
 const isRenterPending = (booking) => {
     const statusNum = Number(booking.status);
 
-    // Requested - waiting for owner, can cancel
     if (statusNum === BookingStatus.Requested) {
         return true;
     }
 
-    // Approved - needs pickup confirmation (only renter can confirm pickup)
     if (statusNum === BookingStatus.Approved) {
         return true;
     }
@@ -49,6 +46,8 @@ export const MyBookingsPage = () => {
     const [filter, setFilter] = useState("all"); // "all" | "pending"
     const [isInitializing, setIsInitializing] = useState(true);
     const [message, setMessage] = useState("");
+    const [pickupFiles, setPickupFiles] = useState({});
+    const [uploadingPickup, setUploadingPickup] = useState({});
 
     // Initialize contract if needed
     useEffect(() => {
@@ -78,7 +77,6 @@ export const MyBookingsPage = () => {
 
         const unsubscribe = web3Service.onAccountChange((newAccount) => {
             if (contract && newAccount) {
-                console.log("Account changed, reloading bookings...");
                 loadBookings();
             }
         });
@@ -89,6 +87,45 @@ export const MyBookingsPage = () => {
     const showMessage = (msg) => {
         setMessage(msg);
         setTimeout(() => setMessage(""), 3000);
+    };
+
+    const handlePickupFileChange = async (bookingId, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!ipfsService.validateFileType(file, allowedTypes)) {
+            alert('Please upload a PDF or image file (PDF, JPG, PNG)');
+            return;
+        }
+
+        // Validate file size (max 10MB)
+        if (!ipfsService.validateFileSize(file, 10)) {
+            alert('File size must be less than 10MB');
+            return;
+        }
+
+        setPickupFiles(prev => ({ ...prev, [bookingId]: file }));
+        setUploadingPickup(prev => ({ ...prev, [bookingId]: true }));
+
+        try {
+            // Upload to IPFS
+            const ipfsURI = await ipfsService.uploadFile(file);
+            
+            // Confirm pickup with IPFS URI
+            const result = await confirmPickup(bookingId, ipfsURI);
+            if (result.success) {
+                showMessage("Pickup confirmed with proof document");
+                await loadBookings();
+            } else {
+                showMessage(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            showMessage(`Upload failed: ${error.message}`);
+        } finally {
+            setUploadingPickup(prev => ({ ...prev, [bookingId]: false }));
+        }
     };
 
     const currentAccount = web3Service.getAccount()?.toLowerCase();
@@ -158,7 +195,6 @@ export const MyBookingsPage = () => {
         <div className="min-h-screen bg-gray-50">
             <Navbar />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
                         My Bookings (Renter)
@@ -168,14 +204,12 @@ export const MyBookingsPage = () => {
                     </p>
                 </div>
 
-                {/* Message */}
                 {message && (
                     <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-green-800">{message}</p>
                     </div>
                 )}
 
-                {/* Filter Tabs */}
                 <div className="mb-6 flex space-x-4 border-b border-gray-200">
                     <button
                         onClick={() => setFilter("all")}
@@ -200,7 +234,6 @@ export const MyBookingsPage = () => {
                     </button>
                 </div>
 
-                {/* Loading State */}
                 {isLoading && (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
@@ -210,7 +243,6 @@ export const MyBookingsPage = () => {
                     </div>
                 )}
 
-                {/* Empty State */}
                 {!isLoading && filteredBookings.length === 0 && (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
@@ -228,7 +260,6 @@ export const MyBookingsPage = () => {
                     </div>
                 )}
 
-                {/* Bookings List */}
                 {!isLoading && filteredBookings.length > 0 && (
                     <div className="space-y-4">
                         {filteredBookings.map((booking) => (
@@ -344,27 +375,43 @@ export const MyBookingsPage = () => {
                                         )}
                                         {booking.status ===
                                             BookingStatus.Approved && (
-                                            <button
-                                                onClick={async () => {
-                                                    const result =
-                                                        await confirmPickup(
-                                                            booking.id
-                                                        );
-                                                    if (result.success) {
-                                                        showMessage(
-                                                            "Pickup confirmed"
-                                                        );
-                                                        await loadBookings();
-                                                    } else {
-                                                        showMessage(
-                                                            `Error: ${result.error}`
-                                                        );
-                                                    }
-                                                }}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                                            >
-                                                Confirm Pickup
-                                            </button>
+                                            <div className="space-y-2">
+                                                <label className="block text-xs text-gray-600 mb-1">
+                                                    Upload Pickup Proof:
+                                                </label>
+                                                <input
+                                                    type="file"
+                                                    id={`pickup-${booking.id}`}
+                                                    accept=".pdf,.jpg,.jpeg,.png"
+                                                    onChange={(e) => handlePickupFileChange(booking.id, e)}
+                                                    disabled={uploadingPickup[booking.id]}
+                                                    className="block w-full text-xs text-gray-500
+                                                        file:mr-2 file:py-1 file:px-2
+                                                        file:rounded file:border-0
+                                                        file:text-xs file:font-semibold
+                                                        file:bg-blue-50 file:text-blue-700
+                                                        hover:file:bg-blue-100
+                                                        disabled:opacity-50 disabled:cursor-not-allowed"
+                                                />
+                                                {uploadingPickup[booking.id] && (
+                                                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                                        Uploading...
+                                                    </div>
+                                                )}
+                                                {pickupFiles[booking.id] && !uploadingPickup[booking.id] && (
+                                                    <p className="text-xs text-green-600">
+                                                        ✓ {pickupFiles[booking.id].name}
+                                                    </p>
+                                                )}
+                                                {booking.pickupProofURI_renter && (
+                                                    <IPFSViewer 
+                                                        ipfsURI={booking.pickupProofURI_renter}
+                                                        title="View pickup proof"
+                                                        className="text-xs"
+                                                    />
+                                                )}
+                                            </div>
                                         )}
                                         {canOpenDispute(booking.status) &&
                                             booking.status !==
@@ -405,7 +452,6 @@ export const MyBookingsPage = () => {
                     </div>
                 )}
 
-                {/* Refresh Button */}
                 <div className="mt-6 flex justify-end">
                     <button
                         onClick={loadBookings}

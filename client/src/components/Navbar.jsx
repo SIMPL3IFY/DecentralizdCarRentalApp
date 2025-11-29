@@ -28,7 +28,6 @@ export const Navbar = () => {
     // Initialize Web3 and load contract
     useEffect(() => {
         const initializeApp = async () => {
-            // Initialize Web3 if not already initialized
             if (!web3Service.isInitialized()) {
                 try {
                     await web3Service.init();
@@ -40,7 +39,6 @@ export const Navbar = () => {
             setIsWeb3Initialized(web3Service.isInitialized());
             setCurrentAccount(web3Service.getAccount());
 
-            // Load contract if not already loaded
             if (!isLoaded) {
                 const contractAddressToLoad =
                     CONTRACT_ADDRESS || localStorage.getItem("contractAddress");
@@ -55,15 +53,6 @@ export const Navbar = () => {
                                 "contractAddress",
                                 contractAddressToLoad
                             );
-                            console.log(
-                                "Contract loaded in Navbar:",
-                                contractAddressToLoad
-                            );
-                        } else {
-                            console.error(
-                                "Failed to load contract:",
-                                result.error
-                            );
                         }
                     } catch (error) {
                         console.error("Error loading contract:", error);
@@ -74,7 +63,6 @@ export const Navbar = () => {
         initializeApp();
     }, [loadContract, isLoaded]);
 
-    // Listen for account changes
     useEffect(() => {
         if (!isWeb3Initialized) return;
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useListings } from "../hooks/useListings";
 import { useUser } from "../hooks/useUser";
+import { IPFSViewer } from "./IPFSViewer";
 import {
     InsuranceStatus,
     getInsuranceStatusName,
@@ -109,10 +110,18 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                                             {listing.owner.slice(0, 10)}...
                                         </p>
                                         {listing.insuranceDocURI && (
-                                            <p className="text-xs text-blue-600 mt-1">
-                                                Insurance Doc:{" "}
-                                                {listing.insuranceDocURI}
-                                            </p>
+                                            <div className="mt-1">
+                                                <p className="text-xs text-gray-600 mb-1">
+                                                    Insurance Document:
+                                                </p>
+                                                <IPFSViewer
+                                                    ipfsURI={
+                                                        listing.insuranceDocURI
+                                                    }
+                                                    title="View insurance document"
+                                                    className="text-xs"
+                                                />
+                                            </div>
                                         )}
                                     </div>
                                     <div className="flex gap-2 ml-4">
@@ -146,7 +155,6 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                 )}
             </div>
 
-            {/* Rejected Listings Section */}
             {rejectedListings.length > 0 && (
                 <div>
                     <div className="flex justify-between items-center mb-4">
@@ -209,7 +217,6 @@ export const InsuranceVerifierDashboard = ({ contract, log }) => {
                 </div>
             )}
 
-            {/* Approved Listings Section */}
             <div>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold">

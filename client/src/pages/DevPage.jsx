@@ -32,9 +32,7 @@ export default function DevPage() {
         setLog((prev) => prev + message + "\n");
     };
 
-    const onConnect = () => {
-        // Web3 connected
-    };
+    const onConnect = () => {};
 
     const onSwitchAccount = async (newAccount) => {
         append(`Switched to: ${newAccount}`);

@@ -1,9 +1,6 @@
 import Web3 from "web3";
 import { RPC_URL } from "../constants/config";
 
-/**
- * Web3 Connection Service
- */
 class Web3Service {
     constructor() {
         this.web3 = null;
@@ -13,9 +10,6 @@ class Web3Service {
         this.accountChangeListeners = [];
     }
 
-    /**
-     * Initialize Web3 connection
-     */
     async init() {
         try {
             this.web3 = new Web3(RPC_URL);
@@ -27,9 +21,8 @@ class Web3Service {
             this.chainId = String(chainId);
             const oldAccount = this.account;
             this.account = accounts.length > 0 ? accounts[0] : null;
-            this.accounts = accounts; // Store all accounts
+            this.accounts = accounts;
 
-            // Notify listeners if account changed during init
             if (oldAccount !== this.account && this.account) {
                 this.notifyAccountChange(this.account, oldAccount);
             }
@@ -48,9 +41,6 @@ class Web3Service {
         }
     }
 
-    /**
-     * Get all available accounts
-     */
     async getAccounts() {
         if (!this.web3) return [];
         try {
@@ -62,9 +52,6 @@ class Web3Service {
         }
     }
 
-    /**
-     * Switch to a different account
-     */
     async switchAccount(accountAddress) {
         if (!this.web3) throw new Error("Web3 not initialized");
 
@@ -83,12 +70,8 @@ class Web3Service {
         return { success: true, account: this.account };
     }
 
-    /**
-     * Subscribe to account change events
-     */
     onAccountChange(callback) {
         this.accountChangeListeners.push(callback);
-        // Return unsubscribe function
         return () => {
             this.accountChangeListeners = this.accountChangeListeners.filter(
                 (listener) => listener !== callback
@@ -96,9 +79,6 @@ class Web3Service {
         };
     }
 
-    /**
-     * Notify all listeners of account change
-     */
     notifyAccountChange(newAccount, oldAccount) {
         this.accountChangeListeners.forEach((listener) => {
             try {
@@ -108,8 +88,6 @@ class Web3Service {
             }
         });
     }
-
-    // ==================== Utility Methods ====================
 
     getWeb3() {
         return this.web3;
@@ -138,5 +116,4 @@ class Web3Service {
     }
 }
 
-// Export singleton instance
 export const web3Service = new Web3Service();

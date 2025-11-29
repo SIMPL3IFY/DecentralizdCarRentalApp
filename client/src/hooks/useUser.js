@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { contractService } from "../services/contractService";
 import { web3Service } from "../services/web3Service";
 
-/**
- * Hook for managing user state and registration
- */
 export const useUser = (contract) => {
     const [isRegistered, setIsRegistered] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +18,6 @@ export const useUser = (contract) => {
                 .catch(() => "0");
             setWalletBalance(walletBal);
         } catch (error) {
-            console.error("Error fetching wallet balance:", error);
             setWalletBalance("0");
         }
     }, []);
@@ -40,17 +36,6 @@ export const useUser = (contract) => {
             setIsArbitrator(arbitrator);
             setBalance(userBalance);
             setWalletBalance(walletBal);
-
-            console.log(
-                "User roles - Verifier:",
-                verifier,
-                "Arbitrator:",
-                arbitrator,
-                "Contract Balance:",
-                userBalance,
-                "Wallet Balance:",
-                walletBal
-            );
         } catch (error) {
             console.error("Error fetching user data:", error);
             setBalance("0");
@@ -69,7 +54,6 @@ export const useUser = (contract) => {
         setIsLoading(true);
         try {
             const registered = await contractService.isRegistered();
-            console.log("Registration check result:", registered);
             setIsRegistered(registered);
 
             if (registered) {
@@ -114,7 +98,6 @@ export const useUser = (contract) => {
         const unsubscribe = web3Service.onAccountChange((newAccount) => {
             if (newAccount && newAccount !== currentAccountRef.current) {
                 currentAccountRef.current = newAccount;
-                console.log("Account changed, refreshing user data...");
                 checkRegistration();
             }
         });
@@ -122,11 +105,8 @@ export const useUser = (contract) => {
         return unsubscribe;
     }, [checkRegistration]);
 
-    // Watch for registration status changes and ensure data is fresh
     useEffect(() => {
         if (contract && isRegistered) {
-            console.log("User is now registered! Refreshing user data...");
-            // Ensure all user data (roles, balances) is fresh when registration status changes
             fetchUserData();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

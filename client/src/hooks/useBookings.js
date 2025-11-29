@@ -1,9 +1,6 @@
 import { useState, useCallback } from "react";
 import { contractService } from "../services/contractService";
 
-/**
- * Hook for managing bookings
- */
 export const useBookings = (contract) => {
     const [bookings, setBookings] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
