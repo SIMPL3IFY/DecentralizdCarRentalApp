@@ -6,6 +6,8 @@ import { useListings } from "../hooks/useListings";
 import { useUser } from "../hooks/useUser";
 import { web3Service } from "../services/web3Service";
 import { contractService } from "../services/contractService";
+import { ipfsService } from "../services/ipfsService";
+import { IPFSViewer } from "../components/IPFSViewer";
 import { InsuranceStatus } from "../constants/insuranceStatus";
 import {
     getStatusName,
@@ -15,18 +17,13 @@ import {
 } from "../constants/bookingStatus";
 import { CONTRACT_ADDRESS } from "../constants/config";
 
-/**
- * Check if a booking is pending (needs owner action)
- */
 const isOwnerPending = (booking) => {
     const statusNum = Number(booking.status);
 
-    // Requested - needs approve/reject
     if (statusNum === BookingStatus.Requested) {
         return true;
     }
 
-    // Active - needs return confirmation (only owner can confirm return)
     if (statusNum === BookingStatus.Active) {
         return true;
     }
@@ -56,6 +53,8 @@ export const MyListingsPage = () => {
     const [filter, setFilter] = useState("all"); // "all" | "pending"
     const [isInitializing, setIsInitializing] = useState(true);
     const [message, setMessage] = useState("");
+    const [returnFiles, setReturnFiles] = useState({});
+    const [uploadingReturn, setUploadingReturn] = useState({});
 
     // Initialize contract if needed
     useEffect(() => {
@@ -86,9 +85,6 @@ export const MyListingsPage = () => {
 
         const unsubscribe = web3Service.onAccountChange((newAccount) => {
             if (contract && newAccount) {
-                console.log(
-                    "Account changed, reloading bookings and listings..."
-                );
                 loadBookings();
                 loadListings();
             }
@@ -100,6 +96,45 @@ export const MyListingsPage = () => {
     const showMessage = (msg) => {
         setMessage(msg);
         setTimeout(() => setMessage(""), 3000);
+    };
+
+    const handleReturnFileChange = async (bookingId, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!ipfsService.validateFileType(file, allowedTypes)) {
+            alert('Please upload a PDF or image file (PDF, JPG, PNG)');
+            return;
+        }
+
+        // Validate file size (max 10MB)
+        if (!ipfsService.validateFileSize(file, 10)) {
+            alert('File size must be less than 10MB');
+            return;
+        }
+
+        setReturnFiles(prev => ({ ...prev, [bookingId]: file }));
+        setUploadingReturn(prev => ({ ...prev, [bookingId]: true }));
+
+        try {
+            // Upload to IPFS
+            const ipfsURI = await ipfsService.uploadFile(file);
+            
+            // Confirm return with IPFS URI
+            const result = await confirmReturn(bookingId, ipfsURI);
+            if (result.success) {
+                showMessage("Return confirmed with proof document");
+                await loadBookings();
+            } else {
+                showMessage(`Error: ${result.error}`);
+            }
+        } catch (error) {
+            showMessage(`Upload failed: ${error.message}`);
+        } finally {
+            setUploadingReturn(prev => ({ ...prev, [bookingId]: false }));
+        }
     };
 
     // Get current account
@@ -210,7 +245,6 @@ export const MyListingsPage = () => {
         <div className="min-h-screen bg-gray-50">
             <Navbar />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
                         My Listings
@@ -220,14 +254,12 @@ export const MyListingsPage = () => {
                     </p>
                 </div>
 
-                {/* Message */}
                 {message && (
                     <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-green-800">{message}</p>
                     </div>
                 )}
 
-                {/* Refresh Button */}
                 <div className="mb-6 flex justify-end">
                     <button
                         onClick={() => {
@@ -243,7 +275,6 @@ export const MyListingsPage = () => {
                     </button>
                 </div>
 
-                {/* Pending Insurance Verification Section */}
                 {pendingInsuranceListings.length > 0 && (
                     <div className="mb-8">
                         <h2 className="text-2xl font-semibold text-gray-900 mb-4">
@@ -303,7 +334,6 @@ export const MyListingsPage = () => {
                     </div>
                 )}
 
-                {/* Rejected Insurance Section */}
                 {rejectedInsuranceListings.length > 0 && (
                     <div className="mb-8">
                         <h2 className="text-2xl font-semibold text-gray-900 mb-4">
@@ -369,7 +399,6 @@ export const MyListingsPage = () => {
                     </div>
                 )}
 
-                {/* Filter Tabs */}
                 <div className="mb-6 flex space-x-4 border-b border-gray-200">
                     <button
                         onClick={() => setFilter("all")}
@@ -398,7 +427,6 @@ export const MyListingsPage = () => {
                     </button>
                 </div>
 
-                {/* Loading State */}
                 {(isLoading || listingsLoading) && (
                     <div className="flex items-center justify-center min-h-[400px]">
                         <div className="text-center">
@@ -408,7 +436,6 @@ export const MyListingsPage = () => {
                     </div>
                 )}
 
-                {/* Empty State */}
                 {!isLoading &&
                     !listingsLoading &&
                     filteredListings.length === 0 && (
@@ -428,7 +455,6 @@ export const MyListingsPage = () => {
                         </div>
                     )}
 
-                {/* Listings with Bookings */}
                 {!isLoading &&
                     !listingsLoading &&
                     filteredListings.length > 0 && (
@@ -438,7 +464,6 @@ export const MyListingsPage = () => {
                                     key={listing.id}
                                     className="bg-white border rounded-lg shadow-sm"
                                 >
-                                    {/* Listing Header */}
                                     <div className="p-6 border-b border-gray-200">
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1">
@@ -502,7 +527,6 @@ export const MyListingsPage = () => {
                                         </div>
                                     </div>
 
-                                    {/* Bookings for this Listing */}
                                     {listing.bookings.length > 0 ? (
                                         <div className="p-6 space-y-4">
                                             <h3 className="text-lg font-semibold text-gray-700 mb-4">
@@ -636,30 +660,43 @@ export const MyListingsPage = () => {
                                                             )}
                                                             {booking.status ===
                                                                 BookingStatus.Active && (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        const result =
-                                                                            await confirmReturn(
-                                                                                booking.id
-                                                                            );
-                                                                        if (
-                                                                            result.success
-                                                                        ) {
-                                                                            showMessage(
-                                                                                "Return confirmed"
-                                                                            );
-                                                                            await loadBookings();
-                                                                        } else {
-                                                                            showMessage(
-                                                                                `Error: ${result.error}`
-                                                                            );
-                                                                        }
-                                                                    }}
-                                                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                                                                >
-                                                                    Confirm
-                                                                    Return
-                                                                </button>
+                                                                <div className="space-y-2">
+                                                                    <label className="block text-xs text-gray-600 mb-1">
+                                                        Upload Return Proof:
+                                                                    </label>
+                                                                    <input
+                                                                        type="file"
+                                                                        id={`return-${booking.id}`}
+                                                                        accept=".pdf,.jpg,.jpeg,.png"
+                                                                        onChange={(e) => handleReturnFileChange(booking.id, e)}
+                                                                        disabled={uploadingReturn[booking.id]}
+                                                                        className="block w-full text-xs text-gray-500
+                                                                            file:mr-2 file:py-1 file:px-2
+                                                                            file:rounded file:border-0
+                                                                            file:text-xs file:font-semibold
+                                                                            file:bg-blue-50 file:text-blue-700
+                                                                            hover:file:bg-blue-100
+                                                                            disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    />
+                                                                    {uploadingReturn[booking.id] && (
+                                                                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                                                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
+                                                                            Uploading...
+                                                                        </div>
+                                                                    )}
+                                                                    {returnFiles[booking.id] && !uploadingReturn[booking.id] && (
+                                                                        <p className="text-xs text-green-600">
+                                                                            ✓ {returnFiles[booking.id].name}
+                                                                        </p>
+                                                                    )}
+                                                                    {booking.returnProofURI_owner && (
+                                                                        <IPFSViewer 
+                                                                            ipfsURI={booking.returnProofURI_owner}
+                                                                            title="View return proof"
+                                                                            className="text-xs"
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             )}
                                                             {canOpenDispute(
                                                                 booking.status

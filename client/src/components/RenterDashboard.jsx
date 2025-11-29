@@ -40,7 +40,6 @@ export const RenterDashboard = ({ contract, log }) => {
         }
     }, [contract, loadListings, loadBookings]);
 
-    // Track account to reload bookings when it changes
     const [trackedAccount, setTrackedAccount] = useState(
         web3Service.getAccount()
     );
@@ -128,8 +127,6 @@ export const RenterDashboard = ({ contract, log }) => {
 
     const currentAccount = web3Service.getAccount()?.toLowerCase();
 
-    // Show all active, approved listings (including own listings),
-    // and optionally highlight or note if the listing is owned by the current account.
     const availableListings = listings.filter(
         (l) => l.active && l.insuranceStatus === InsuranceStatus.Approved
     );

@@ -3,18 +3,12 @@ import { CONTRACT_ABI_PATH, GAS_LIMITS } from "../constants/config";
 import { BookingStatus } from "../constants/bookingStatus";
 import { InsuranceStatus } from "../constants/insuranceStatus";
 
-/**
- * CarRental Contract Service
- */
 class ContractService {
     constructor() {
         this.contract = null;
         this.contractAddress = null;
     }
 
-    /**
-     * Load contract from address
-     */
     async loadContract(contractAddress) {
         try {
             const web3 = web3Service.getWeb3();
@@ -22,7 +16,6 @@ class ContractService {
                 throw new Error("Web3 not initialized");
             }
 
-            // Check if contract exists at this address
             const code = await web3.eth.getCode(contractAddress);
             if (!code || code === "0x" || code === "0x0") {
                 throw new Error(
@@ -43,39 +36,24 @@ class ContractService {
         }
     }
 
-    /**
-     * Get contract instance
-     */
     getContract() {
         return this.contract;
     }
 
-    /**
-     * Get contract address
-     */
     getContractAddress() {
         return this.contractAddress;
     }
 
-    /**
-     * Check if contract is loaded
-     */
     isLoaded() {
         return this.contract !== null;
     }
 
-    // ==================== Helper Methods ====================
-
-    /**
-     * Parse listing data from contract response
-     */
     _parseListing(listing, listingId) {
         const owner = listing.carOwner || listing[0];
         const dailyPrice = listing.dailyPrice || listing[1];
         const deposit = listing.securityDeposit || listing[2];
         const active =
             listing.active !== undefined ? listing.active : listing[3];
-        // Parse insuranceStatus enum (0 = Pending, 1 = Approved, 2 = Rejected)
         const insuranceStatus =
             listing.insuranceStatus !== undefined
                 ? Number(listing.insuranceStatus)
@@ -99,7 +77,6 @@ class ContractService {
             deposit: web3Service.fromWei(deposit.toString(), "ether"),
             active: Boolean(active),
             insuranceStatus: insuranceStatus,
-            // Keep insuranceValid for backward compatibility (true if Approved)
             insuranceValid: insuranceStatus === InsuranceStatus.Approved,
             insuranceDocURI,
             make,
@@ -109,9 +86,6 @@ class ContractService {
         };
     }
 
-    /**
-     * Check if listing exists (not zero address and has price)
-     */
     _isValidListing(listing) {
         const carOwner = listing.carOwner || listing[0];
         const dailyPrice = listing.dailyPrice || listing[1];
@@ -124,9 +98,6 @@ class ContractService {
         );
     }
 
-    /**
-     * Extract revert reason from error
-     */
     _extractRevertReason(error) {
         if (error.message) {
             const match =
@@ -139,9 +110,6 @@ class ContractService {
         return "Unknown error";
     }
 
-    /**
-     * Parse booking data from contract response
-     */
     _parseBooking(booking, bookingId, listing = null) {
         const baseBooking = {
             id: bookingId,
@@ -171,9 +139,6 @@ class ContractService {
         return baseBooking;
     }
 
-    /**
-     * Convert Web3 result to boolean
-     */
     _toBoolean(result) {
         if (typeof result === "boolean") return result;
         if (result && typeof result === "object") {
@@ -189,22 +154,15 @@ class ContractService {
         return Boolean(result);
     }
 
-    // ==================== User Functions ====================
-
-    /**
-     * Register user
-     */
     async register() {
         const account = web3Service.getAccount();
         const web3 = web3Service.getWeb3();
 
-        // Check if already registered first
         const alreadyRegistered = await this.isRegistered(account);
         if (alreadyRegistered) {
             throw new Error("User is already registered");
         }
 
-        // Try to simulate the call first to get revert reason
         try {
             await this.contract.methods.register().call({ from: account });
         } catch (callError) {
@@ -212,43 +170,28 @@ class ContractService {
             throw new Error(`Transaction will revert: ${revertReason}`);
         }
 
-        // If call succeeds, send the transaction
         try {
             const tx = await this.contract.methods
                 .register()
                 .send({ from: account, gas: GAS_LIMITS.register });
 
-            console.log("Registration transaction sent:", tx.transactionHash);
-
-            // Check if UserRegistered event was emitted
-            if (tx.events && tx.events.UserRegistered) {
-                console.log("UserRegistered event detected");
-            }
-
-            // Wait a bit for state to update (Ganache is instant but let's be safe)
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
-            // Verify registration after transaction
             let attempts = 0;
             let verified = false;
             while (attempts < 10 && !verified) {
                 const check = await this.isRegistered(account);
-                console.log(`Verification attempt ${attempts + 1}: ${check}`);
                 if (check) {
                     verified = true;
-                    console.log("Registration verified after transaction");
                     break;
                 }
-                await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 0.5 seconds
+                await new Promise((resolve) => setTimeout(resolve, 500));
                 attempts++;
             }
 
             if (!verified) {
                 console.warn(
-                    "Registration transaction completed but verification failed after 10 attempts."
-                );
-                console.warn(
-                    "The registration may still be processing. Try checking status manually."
+                    "Registration transaction completed but verification failed after 10 attempts. The registration may still be processing."
                 );
             }
 
@@ -281,47 +224,25 @@ class ContractService {
                 }
             }
 
-            console.error("Registration error details:", error);
             throw new Error(errorMessage);
         }
     }
 
-    /**
-     * Check if user is registered
-     */
     async isRegistered(address = null) {
         const account = address || web3Service.getAccount();
         if (!account || !this.contract) {
-            if (!account)
-                console.error("No account available for registration check");
-            if (!this.contract) console.error("Contract not loaded");
             return false;
         }
 
         try {
             const result = await this.contract.methods.users(account).call();
-            console.log(
-                `Registration check for ${account}:`,
-                result,
-                typeof result
-            );
             return this._toBoolean(result);
         } catch (error) {
             console.error("Error checking registration:", error);
-            console.error("Error details:", {
-                message: error.message,
-                code: error.code,
-                data: error.data,
-            });
             return false;
         }
     }
 
-    // ==================== Listing Functions ====================
-
-    /**
-     * Create listing
-     */
     async createListing(
         dailyPriceEth,
         depositEth,
@@ -351,17 +272,11 @@ class ContractService {
         return { success: true, listingId: Number(listingId), tx };
     }
 
-    /**
-     * Get listing by ID
-     */
     async getListing(listingId) {
         const listing = await this.contract.methods.listings(listingId).call();
         return this._parseListing(listing, listingId);
     }
 
-    /**
-     * Get all listings
-     */
     async getAllListings() {
         const listings = [];
         const maxAttempts = 1000;
@@ -376,20 +291,13 @@ class ContractService {
 
                 listings.push(this._parseListing(listing, i));
             } catch (error) {
-                if (i === 0) {
-                    console.warn("Error fetching listings:", error);
-                }
                 break;
             }
         }
 
-        console.log(`Loaded ${listings.length} listing(s) from contract`);
         return listings;
     }
 
-    /**
-     * Edit listing
-     */
     async editListing(
         listingId,
         dailyPriceEth,
@@ -418,9 +326,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.editListing });
     }
 
-    /**
-     * Set listing active status
-     */
     async setListingActive(listingId, active) {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -428,9 +333,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.setListingActive });
     }
 
-    /**
-     * Verify insurance (insurance verifier only)
-     */
     async verifyInsurance(listingId, isValid) {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -438,9 +340,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.verifyInsurance });
     }
 
-    /**
-     * Check if account is insurance verifier
-     */
     async isInsuranceVerifier(address = null) {
         const account = address || web3Service.getAccount();
         const verifierAddr = await this.contract.methods
@@ -449,39 +348,14 @@ class ContractService {
         return verifierAddr.toLowerCase() === account.toLowerCase();
     }
 
-    // ==================== Booking Functions ====================
-
-    /**
-     * Convert date string (YYYY-MM-DD) to Unix timestamp
-     * We interpret the date as "the start of this day in the user's local timezone"
-     * then convert to UTC timestamp. This ensures that when a user selects "tomorrow"
-     * in their timezone, it's correctly represented.
-     *
-     * For example, if user in PST (UTC-8) selects 2025-11-24:
-     * - Local: 2025-11-24 00:00:00 PST
-     * - UTC: 2025-11-24 08:00:00 UTC
-     * - This ensures the booking starts at the beginning of that day in their timezone
-     */
     _dateToTimestamp(dateString) {
-        // Parse date string - when you do new Date("YYYY-MM-DD"), it's interpreted as local midnight
-        // But to be explicit, we'll create it at local midnight
         const [year, month, day] = dateString.split("-").map(Number);
-        const date = new Date(year, month - 1, day, 0, 0, 0, 0); // Local midnight
+        const date = new Date(year, month - 1, day, 0, 0, 0, 0);
         const timestamp = Math.floor(date.getTime() / 1000);
-
-        // Debug logging
-        console.log(
-            `Date conversion: ${dateString} (local) -> ${timestamp} (${new Date(
-                timestamp * 1000
-            ).toISOString()} UTC)`
-        );
 
         return timestamp;
     }
 
-    /**
-     * Calculate escrow amount for booking
-     */
     calculateEscrow(listing, startDate, endDate) {
         const startTimestamp = this._dateToTimestamp(startDate);
         const endTimestamp = this._dateToTimestamp(endDate);
@@ -504,17 +378,12 @@ class ContractService {
         };
     }
 
-    /**
-     * Request booking
-     */
     async requestBooking(listingId, startDate, endDate) {
         const account = web3Service.getAccount();
         const web3 = web3Service.getWeb3();
 
-        // Get listing to calculate escrow
         const listing = await this.getListing(listingId);
 
-        // Validate listing
         if (listing.insuranceStatus !== InsuranceStatus.Approved) {
             throw new Error("Listing insurance not approved");
         }
@@ -522,30 +391,12 @@ class ContractService {
             throw new Error("Listing is inactive");
         }
 
-        // Convert dates to timestamps (midnight UTC)
         const startTimestamp = this._dateToTimestamp(startDate);
         const endTimestamp = this._dateToTimestamp(endDate);
 
-        // Get current block timestamp to validate
         const latestBlock = await web3.eth.getBlock("latest");
         const currentTimestamp = Number(latestBlock.timestamp);
 
-        // Debug logging
-        console.log(
-            `Current block timestamp: ${currentTimestamp} (${new Date(
-                currentTimestamp * 1000
-            ).toISOString()})`
-        );
-        console.log(
-            `Start timestamp: ${startTimestamp} (${new Date(
-                startTimestamp * 1000
-            ).toISOString()})`
-        );
-        console.log(`Difference: ${startTimestamp - currentTimestamp} seconds`);
-
-        // Validate start date is in the future
-        // The contract uses >= so we need startTimestamp >= block.timestamp
-        // Add a 120 second buffer to account for transaction processing time and clock drift
         const bufferSeconds = 120;
         if (startTimestamp < currentTimestamp + bufferSeconds) {
             const selectedDate = new Date(startTimestamp * 1000).toISOString();
@@ -563,7 +414,6 @@ class ContractService {
             );
         }
 
-        // Calculate escrow
         const { escrow } = this.calculateEscrow(listing, startDate, endDate);
 
         const tx = await this.contract.methods
@@ -578,18 +428,12 @@ class ContractService {
         return { success: true, bookingId: Number(bookingId), tx };
     }
 
-    /**
-     * Get booking by ID
-     */
     async getBooking(bookingId) {
         const booking = await this.contract.methods.bookings(bookingId).call();
         const listing = await this.getListing(booking.listingId);
         return this._parseBooking(booking, bookingId, listing);
     }
 
-    /**
-     * Get bookings for current user
-     */
     async getMyBookings() {
         const account = web3Service.getAccount();
         const bookings = [];
@@ -602,7 +446,6 @@ class ContractService {
                     .listings(booking.listingId)
                     .call();
 
-                // Parse listing first to get the owner reliably
                 const parsedListing = this._parseListing(
                     listing,
                     Number(booking.listingId)
@@ -631,10 +474,6 @@ class ContractService {
         return bookings;
     }
 
-    /**
-     * Get all disputed bookings (for arbitrator)
-     * BookingStatus.Disputed = 7
-     */
     async getDisputedBookings() {
         const bookings = [];
         const seenIds = new Set();
@@ -676,9 +515,6 @@ class ContractService {
         return bookings;
     }
 
-    /**
-     * Approve booking
-     */
     async approveBooking(bookingId) {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -686,9 +522,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.approveBooking });
     }
 
-    /**
-     * Reject booking
-     */
     async rejectBooking(bookingId) {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -696,9 +529,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.rejectBooking });
     }
 
-    /**
-     * Cancel booking (renter only, before active)
-     */
     async cancelBooking(bookingId) {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -706,9 +536,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.cancelBooking });
     }
 
-    /**
-     * Confirm pickup
-     */
     async confirmPickup(bookingId, proofURI = "ipfs://pickup") {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -716,9 +543,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.confirmPickup });
     }
 
-    /**
-     * Confirm return
-     */
     async confirmReturn(bookingId, proofURI = "ipfs://return") {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -726,9 +550,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.confirmReturn });
     }
 
-    /**
-     * Open dispute
-     */
     async openDispute(bookingId) {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -736,9 +557,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.openDispute });
     }
 
-    /**
-     * Resolve dispute (arbitrator only)
-     */
     async resolveDispute(bookingId, ownerPayoutEth, renterPayoutEth) {
         const account = web3Service.getAccount();
         const ownerPayout = web3Service.toWei(ownerPayoutEth, "ether");
@@ -749,29 +567,18 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.resolveDispute });
     }
 
-    /**
-     * Check if account is arbitrator
-     */
     async isArbitrator(address = null) {
         const account = address || web3Service.getAccount();
         const arbitratorAddr = await this.contract.methods.arbitrator().call();
         return arbitratorAddr.toLowerCase() === account.toLowerCase();
     }
 
-    // ==================== Rating Functions ====================
-
-    /**
-     * Validate rating score
-     */
     _validateRating(score) {
         if (score < 1 || score > 5) {
             throw new Error("Rating must be between 1 and 5");
         }
     }
 
-    /**
-     * Rate owner (renter only)
-     */
     async rateOwner(bookingId, score) {
         this._validateRating(score);
         const account = web3Service.getAccount();
@@ -780,9 +587,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.rateOwner });
     }
 
-    /**
-     * Rate renter (owner only)
-     */
     async rateRenter(bookingId, score) {
         this._validateRating(score);
         const account = web3Service.getAccount();
@@ -791,9 +595,6 @@ class ContractService {
             .send({ from: account, gas: GAS_LIMITS.rateRenter });
     }
 
-    /**
-     * Get ratings for booking
-     */
     async getRatings(bookingId) {
         const [ownerRating, renterRating] = await Promise.all([
             this.contract.methods.rateOwnerScore(bookingId).call(),
@@ -812,11 +613,6 @@ class ContractService {
         };
     }
 
-    // ==================== Funds Functions ====================
-
-    /**
-     * Get balance for account (contract balance - funds available to withdraw)
-     */
     async getBalance(address = null) {
         if (!this.contract) throw new Error("Contract not loaded");
 
@@ -834,9 +630,6 @@ class ContractService {
         }
     }
 
-    /**
-     * Get wallet ETH balance (actual ETH in the wallet)
-     */
     async getWalletBalance(address = null) {
         if (!web3Service.isInitialized())
             throw new Error("Web3 not initialized");
@@ -854,9 +647,6 @@ class ContractService {
         }
     }
 
-    /**
-     * Withdraw funds
-     */
     async withdraw() {
         const account = web3Service.getAccount();
         return await this.contract.methods
@@ -865,5 +655,4 @@ class ContractService {
     }
 }
 
-// Export singleton instance
 export const contractService = new ContractService();

@@ -9,7 +9,6 @@ export const InsuranceVerifierPage = () => {
     const { contract, loadContract, isLoaded } = useContract();
     const { isRegistered, isInsuranceVerifier } = useUser(contract);
     const [isInitializing, setIsInitializing] = useState(true);
-    const [logMessages, setLogMessages] = useState([]);
 
     useEffect(() => {
         const initialize = async () => {
@@ -25,9 +24,7 @@ export const InsuranceVerifierPage = () => {
         initialize();
     }, [isLoaded, loadContract]);
 
-    const log = (message) => {
-        setLogMessages((prev) => [...prev, message]);
-    };
+    const log = () => {};
 
     if (isInitializing) {
         return (

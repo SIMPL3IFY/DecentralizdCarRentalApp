@@ -1,9 +1,6 @@
 import { useState, useCallback } from "react";
 import { contractService } from "../services/contractService";
 
-/**
- * Hook for managing listings
- */
 export const useListings = (contract) => {
     const [listings, setListings] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
